@@ -21,8 +21,28 @@ const TIME_MULTIPLIER = 24;
 // Game start time: January 1, Year 1, 00:00 (represented in milliseconds)
 const GAME_EPOCH = 0; // We'll use 0 as the starting point
 
-// Track when the server started in real time
-let serverStartRealTime = Date.now();
+// Align server start time to the most recent hour boundary
+// This ensures daily ticks happen at :00 of every hour (1:00, 2:00, 3:00, etc)
+function getAlignedServerStartTime() {
+  const now = new Date();
+  
+  // Create a date for the current hour boundary (top of the hour)
+  const currentHourBoundary = new Date(now);
+  currentHourBoundary.setMinutes(0);
+  currentHourBoundary.setSeconds(0);
+  currentHourBoundary.setMilliseconds(0);
+  
+  // If we haven't reached this hour's boundary yet, use the previous hour
+  const boundaryTime = currentHourBoundary.getTime();
+  if (boundaryTime > now.getTime()) {
+    return boundaryTime - (60 * 60 * 1000); // Go back to previous hour
+  }
+  
+  return boundaryTime;
+}
+
+// Track when the server started in real time (aligned to hour boundary)
+let serverStartRealTime = getAlignedServerStartTime();
 let serverStartGameTime = GAME_EPOCH;
 
 /**
@@ -141,8 +161,18 @@ app.use((req, res) => {
 // ============================================
 
 app.listen(PORT, () => {
+  const nextHourBoundary = new Date();
+  nextHourBoundary.setHours(nextHourBoundary.getHours() + 1);
+  nextHourBoundary.setMinutes(0);
+  nextHourBoundary.setSeconds(0);
+  nextHourBoundary.setMilliseconds(0);
+  
+  const currentGameTime = formatGameTime(getGameTime());
+  const nextTickTime = nextHourBoundary.toLocaleTimeString();
+  
   console.log(`\n🎮 Warcamps Server Running`);
   console.log(`📍 Listening on http://localhost:${PORT}`);
   console.log(`⚙️  Time Multiplier: ${TIME_MULTIPLIER}x`);
-  console.log(`🕐 Current Game Time: ${JSON.stringify(formatGameTime(getGameTime()), null, 2)}\n`);
+  console.log(`🕐 Current Game Time: Year ${currentGameTime.year}, Month ${currentGameTime.month}, Day ${currentGameTime.day}`);
+  console.log(`📅 Next Day Tick: ${nextTickTime} (top of the hour)\n`);
 });
