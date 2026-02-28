@@ -106,6 +106,11 @@ export function stopTitleFlash() {
 }
 
 export function formatTime(ms) {
+    // Guard against NaN or negative values
+    if (!Number.isFinite(ms) || ms < 0) {
+        return "--:--";
+    }
+    
     const totalSecs = Math.ceil(ms / 1000);
     const hours = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);

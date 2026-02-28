@@ -10,7 +10,8 @@ let serverTimeCache = {
     localRealTime: 0,
     lastSync: 0,
     syncing: false,
-    nextTickTime: 0
+    nextTickTime: null,
+    timeMultiplier: 24
 };
 
 /**
@@ -27,14 +28,16 @@ export async function fetchServerTime() {
         
         // Cache the time data with local timestamp for interpolation
         serverTimeCache = {
-            gameMs: data.gameMs,
-            serverRealTime: data.serverRealTime,
+            gameMs: data.gameMs || 0,
+            serverRealTime: data.serverRealTime || Date.now(),
             localRealTime: Date.now(),
             lastSync: Date.now(),
             syncing: false,
-            nextTickTime: data.nextTickTime
+            nextTickTime: data.nextTickTime || null,
+            timeMultiplier: data.timeMultiplier || 24
         };
         
+        console.log('✅ Server sync successful. Next tick:', new Date(data.nextTickTime).toLocaleTimeString());
         return data;
     } catch (error) {
         console.error('Failed to fetch server time:', error);
@@ -147,18 +150,25 @@ export async function syncWithServer() {
  * @returns {number} Real-time milliseconds until next day
  */
 export function getTimeUntilNextDay() {
-    if (serverTimeCache.nextTickTime === 0) {
-        // Fallback if server hasn't been synced yet
-        const currentGameMs = getCurrentGameTime();
-        const GAME_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in game time
-        const msIntoCurrentDay = currentGameMs % GAME_DAY_MS;
-        const gameTimeRemaining = GAME_DAY_MS - msIntoCurrentDay;
-        return gameTimeRemaining / 24;
+    // If we have next tick time from server, use it
+    if (serverTimeCache.nextTickTime && serverTimeCache.nextTickTime > 0) {
+        const now = Date.now();
+        const timeRemaining = serverTimeCache.nextTickTime - now;
+        
+        // Return max of 0 and remaining (prevents negative numbers)
+        return Math.max(0, timeRemaining);
     }
     
-    // Use server's next tick time for accuracy
-    const now = Date.now();
-    const timeRemaining = serverTimeCache.nextTickTime - now;
+    // Fallback: calculate based on game time (shouldn't normally reach here once synced)
+    // Calculate next hour boundary in real time
+    const now = new Date();
+    const nextHour = new Date();
+    nextHour.setHours(nextHour.getHours() + 1);
+    nextHour.setMinutes(0);
+    nextHour.setSeconds(0);
+    nextHour.setMilliseconds(0);
+    
+    const timeRemaining = nextHour.getTime() - now.getTime();
     return Math.max(0, timeRemaining);
 }
 
