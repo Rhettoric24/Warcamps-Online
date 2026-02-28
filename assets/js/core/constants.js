@@ -1,5 +1,5 @@
 // Dev mode flag - Set to true for faster testing (10 sec days, 25k spheres, 10 gemhearts)
-export const DEV_MODE = true; // Change to true for dev/testing
+export const DEV_MODE = false; // Change to true for dev/testing
 
 // Helper function to get DAY_MS based on DEV_MODE
 export function getDAY_MS() {
