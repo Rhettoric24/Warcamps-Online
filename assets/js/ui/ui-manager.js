@@ -3,6 +3,7 @@ import { CONSTANTS, BUILDING_DATA, FABRIAL_DATA, NPC_PRINCES } from '../core/con
 import { getArmyStats, getAvailableTroops, getSpyPower } from '../military/military.js';
 import { getBuildingCost } from '../buildings/buildings.js';
 import { formatTime } from '../core/utils.js';
+import { getCurrentGameTime, formatGameTime, getTimeUntilNextDay } from '../core/server-api.js';
 import { updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket } from './modal-manager.js';
 import { generateThrillButtons } from '../arena/arena.js';
 import { isArenaBoostActive, isFabrialBurnedOut, isGravityBoostActive, isGravityBurnout } from '../events/highstorm.js';
@@ -103,17 +104,15 @@ function updateModalsUI(gameState) {
 }
 
 export function updateTimeUI(gameState) {
-    const totalDays = gameState.state.dayCount ?? 0;
-    const daysPerYear = CONSTANTS.DAYS_PER_YEAR;
-    const years = Math.floor(totalDays / daysPerYear) + 1;
-    const remainingDays = totalDays % daysPerYear;
-    const months = Math.floor(remainingDays / CONSTANTS.DAYS_PER_MONTH) + 1;
-    const days = (remainingDays % CONSTANTS.DAYS_PER_MONTH) + 1;
+    // Get current server time
+    const currentGameMs = getCurrentGameTime();
+    const formatted = formatGameTime(currentGameMs);
+    
+    // Display year, month, day
+    document.getElementById('display-date').innerText = `Year ${formatted.year}, Month ${formatted.month}, Day ${formatted.day}`;
 
-    document.getElementById('display-date').innerText = `Year ${years}, Month ${months}, Day ${days}`;
-
-    const lastTick = gameState.state.lastTickTime || Date.now();
-    const msNext = CONSTANTS.DAY_MS - ((Date.now() - lastTick) % CONSTANTS.DAY_MS);
+    // Calculate time until next day
+    const msNext = getTimeUntilNextDay();
     const timeStr = formatTime(msNext);
     const displayTime = document.getElementById('display-time');
     if (displayTime) displayTime.innerText = `Next Day: ${timeStr}`;

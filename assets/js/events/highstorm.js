@@ -1,6 +1,7 @@
 // Highstorm event system - devastating weather events
 import { BUILDING_DATA, CONSTANTS } from '../core/constants.js';
 import { log, triggerNotification } from '../core/utils.js';
+import { getCurrentGameTime } from '../core/server-api.js';
 import { getBuildingCost } from '../buildings/buildings.js';
 import { processCasualties } from '../military/military.js';
 import { addReport } from '../ui/ui-manager.js';
@@ -61,7 +62,7 @@ export function triggerHighstorm(gameState) {
     gameState.state.highstorm.nextStormProbability = 0;
     gameState.state.highstorm.active = true;
     gameState.state.highstorm.effectsEndDay = gameState.state.dayCount + 2; // Effects last 2 days
-    gameState.state.highstorm.triggerTime = Date.now(); // Track when the storm started
+    gameState.state.highstorm.triggerTime = getCurrentGameTime(); // Track when the storm started
     
     let stormReport = [];
     let detailedEffects = []; // For the modal

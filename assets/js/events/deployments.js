@@ -1,6 +1,7 @@
 // Deployment and mission management module
 import { UNIT_STATS, CONSTANTS, NPC_PRINCES } from '../core/constants.js';
 import { log, triggerNotification } from '../core/utils.js';
+import { getCurrentGameTime } from '../core/server-api.js';
 import { processCasualties, getAvailableTroops, getArcherProtection } from '../military/military.js';
 import { simulateNPCJoin } from './plateau-runs.js';
 import { resolveSpy } from '../espionage/espionage.js';
@@ -331,11 +332,11 @@ export function confirmDeploy(gameState) {
         
         const durationMs = CONSTANTS.DAY_MS;
         const deployment = {
-            id: Date.now(),
+            id: getCurrentGameTime(),
             type: 'conquest',
             units: units,
             power: power,
-            returnTime: Date.now() + durationMs,
+            returnTime: getCurrentGameTime() + durationMs,
             startDay: new Date().toLocaleTimeString(),
             enemyPower: enemyPower,
             landReward: landReward,
@@ -353,10 +354,10 @@ export function confirmDeploy(gameState) {
     const baseDays = gameState.state.pendingDeployType === 'scout' ? 1 : 1.5;
     const durationMs = (baseDays * CONSTANTS.DAY_MS) / speed;
     const deployment = {
-        id: Date.now(),
+        id: getCurrentGameTime(),
         type: gameState.state.pendingDeployType,
         units: units,
-        returnTime: Date.now() + durationMs,
+        returnTime: getCurrentGameTime() + durationMs,
         startDay: new Date().toLocaleTimeString()
     };
 
@@ -367,7 +368,7 @@ export function confirmDeploy(gameState) {
 }
 
 export function checkDeployments(gameState) {
-    const now = Date.now();
+    const now = getCurrentGameTime();
     const finished = gameState.state.deployments.filter(d => now >= d.returnTime);
     gameState.state.deployments = gameState.state.deployments.filter(d => now < d.returnTime);
     finished.forEach(d => {
@@ -742,7 +743,7 @@ export function recallMission(gameState) {
     }
     
     // Calculate remaining time
-    const timeLeftMs = Math.max(0, mission.returnTime - Date.now());
+    const timeLeftMs = Math.max(0, mission.returnTime - getCurrentGameTime());
     
     if (timeLeftMs === 0) {
         log("Mission is already returning.", "text-yellow-400");
@@ -751,7 +752,7 @@ export function recallMission(gameState) {
     
     // Set new return time to 50% of remaining time
     const recallTimeMs = timeLeftMs * 0.5;
-    mission.returnTime = Date.now() + recallTimeMs;
+    mission.returnTime = getCurrentGameTime() + recallTimeMs;
     mission.recalled = true;
     
     const hrs = Math.floor(recallTimeMs / 3600000);

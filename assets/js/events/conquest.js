@@ -2,6 +2,7 @@
 // Conquest missions are now integrated with the standard deployment system
 
 import { CONSTANTS, NPC_PRINCES, UNIT_STATS, BUILDING_DATA } from '../core/constants.js';
+import { getCurrentGameTime } from '../core/server-api.js';
 
 /**
  * Calculate land used by buildings
@@ -156,9 +157,9 @@ export function getConquestStatus(game) {
         return null;
     }
     
-    const now = Date.now();
+    const now = getCurrentGameTime();
     const timeLeft = Math.max(0, conquest.returnTime - now);
-    const totalTime = conquest.returnTime - Date.now() + timeLeft;
+    const totalTime = conquest.returnTime - getCurrentGameTime() + timeLeft;
     const progress = Math.floor(((totalTime - timeLeft) / totalTime) * 100);
     
     return {

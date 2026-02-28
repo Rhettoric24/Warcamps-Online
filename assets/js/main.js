@@ -1,6 +1,7 @@
 // Main entry point for Warcamp Simulator
 import { CONSTANTS, NPC_PRINCES, DEV_MODE, BUILDING_DATA } from './core/constants.js';
 import { createGameState, loadGameState, saveGameState } from './core/game-state.js';
+import { initializeServerConnection, getCurrentGameTime, syncWithServer, gameMsToDays, formatGameTime, getTimeUntilNextDay } from './core/server-api.js';
 
 // Log DEV_MODE status immediately on load
 console.log('%c🎮 WARCAMP SIMULATOR LOADED', 'background: #1e3a8a; color: #00f2ff; font-weight: bold; padding: 8px; font-size: 14px;');
@@ -28,13 +29,22 @@ const gameInstance = {
     ...createGameState(),
 
     // Core methods
-    login() {
+    async login() {
         const input = document.getElementById('username-input');
         const name = input.value.trim();
         if (!name) return;
 
         this.username = name;
         document.getElementById('player-name-display').innerText = name;
+        
+        // Connect to server before starting game
+        log('Connecting to server...', 'text-cyan-400');
+        const connected = await initializeServerConnection();
+        if (!connected) {
+            log('⚠️ Server connection failed. Please check your internet and refresh.', 'text-red-400 font-bold');
+            return;
+        }
+        
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('game-container').classList.remove('hidden');
 
@@ -42,6 +52,9 @@ const gameInstance = {
         this.processOfflineTime();
         updateUI(this);
         setInterval(() => this.loop(), CONSTANTS.UI_UPDATE_RATE);
+        
+        // Sync with server every 30 seconds to stay accurate
+        setInterval(() => syncWithServer(), 30000);
         
         log(`Welcome, Highprince ${name}. Warcamp Command online.`, "text-cyan-400 font-bold");
         if (DEV_MODE) {
@@ -71,22 +84,26 @@ const gameInstance = {
     },
 
     processOfflineTime() {
-        const now = Date.now();
-        const lastActive = this.state.lastActiveTime || this.state.lastTickTime || now;
-        const daysAway = Math.floor((now - lastActive) / CONSTANTS.DAY_MS);
-        const elapsed = now - this.state.lastTickTime;
+        const now = getCurrentGameTime();
+        const currentDay = gameMsToDays(now);
+        const lastDay = this.state.dayCount || 0;
+        const daysPassed = currentDay - lastDay;
+        const elapsed = daysPassed * (24 * 60 * 60 * 1000); // Convert days to game ms
         
-        if (elapsed >= CONSTANTS.DAY_MS) {
-            const daysPassed = Math.floor(elapsed / CONSTANTS.DAY_MS);
+        if (daysPassed > 0) {
             const summary = this.processDailyTicks(daysPassed, true);
-            const completed = this.state.deployments.filter(d => d.returnTime <= now);
+            const completed = this.state.deployments.filter(d => {
+                const deployReturnDay = gameMsToDays(d.returnTime);
+                return deployReturnDay <= currentDay;
+            });
             const missionCounts = completed.reduce((acc, d) => {
                 const key = d.type || 'unknown';
                 acc[key] = (acc[key] || 0) + 1;
                 return acc;
             }, {});
             const completedTotal = completed.length;
-            this.state.lastTickTime += daysPassed * CONSTANTS.DAY_MS;
+            this.state.dayCount = currentDay;
+            this.state.lastTickTime = now;
             saveGameState(this.username, this);
             const totalIncome = (summary.spheresFromGems || 0) + (summary.spheresFromMarkets || 0);
             const gemText = summary.researchGemsGained > 0
@@ -95,6 +112,7 @@ const gameInstance = {
             const missionText = completedTotal > 0
                 ? `, ${completedTotal} mission${completedTotal === 1 ? '' : 's'} completed`
                 : '';
+            const daysAway = daysPassed;
             log(`Offline for ${daysPassed} days. +${totalIncome.toLocaleString()} spheres${gemText}${missionText}.`, "text-cyan-400");
 
             addReport(this, 'growth', `Offline catch-up: ${daysPassed} days, +${totalIncome.toLocaleString()} spheres${gemText}${missionText}.`, {
@@ -118,19 +136,23 @@ const gameInstance = {
     },
 
     loop() {
-        const now = Date.now();
-        const elapsed = now - this.state.lastTickTime;
-        if (elapsed >= CONSTANTS.DAY_MS) {
-            const daysPassed = Math.floor(elapsed / CONSTANTS.DAY_MS);
+        const now = getCurrentGameTime();
+        const currentDay = gameMsToDays(now);
+        const lastDay = this.state.dayCount || 0;
+        const daysPassed = currentDay - lastDay;
+        
+        if (daysPassed > 0) {
             const isOffline = daysPassed > 1;
             this.processDailyTicks(daysPassed, isOffline);
-            this.state.lastTickTime += daysPassed * CONSTANTS.DAY_MS;
+            this.state.dayCount = currentDay;
+            this.state.lastTickTime = now;
         }
 
         this.checkPlateau();
         checkDeployments(this);
         updateUI(this);
         this.state.lastActiveTime = now;
+        this.state.lastGameTime = now; // Track server game time
         saveGameState(this.username, this);
     },
 

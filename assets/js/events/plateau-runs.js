@@ -1,9 +1,10 @@
 // Plateau run event system
 import { CONSTANTS, NPC_PRINCES } from '../core/constants.js';
 import { log, triggerNotification, startTitleFlash, stopTitleFlash, flashScreen } from '../core/utils.js';
+import { getCurrentGameTime } from '../core/server-api.js';
 
 export function spawnEvent(gameState) {
-    const now = Date.now();
+    const now = getCurrentGameTime();
     gameState.state.activeRun = {
         id: Math.floor(Math.random() * 999),
         phase: 'WARNING',
@@ -106,10 +107,10 @@ export function resolveRun(gameState) {
     if (run.playerForces) {
         const durationMs = 2 * CONSTANTS.DAY_MS;
         gameState.state.deployments.push({
-            id: Date.now(),
+            id: getCurrentGameTime(),
             type: 'run',
             units: run.playerForces.units,
-            returnTime: Date.now() + durationMs,
+            returnTime: getCurrentGameTime() + durationMs,
             runResult: result
         });
     } else {
