@@ -9,7 +9,8 @@ let serverTimeCache = {
     serverRealTime: 0,
     localRealTime: 0,
     lastSync: 0,
-    syncing: false
+    syncing: false,
+    nextTickTime: 0
 };
 
 /**
@@ -30,7 +31,8 @@ export async function fetchServerTime() {
             serverRealTime: data.serverRealTime,
             localRealTime: Date.now(),
             lastSync: Date.now(),
-            syncing: false
+            syncing: false,
+            nextTickTime: data.nextTickTime
         };
         
         return data;
@@ -141,16 +143,23 @@ export async function syncWithServer() {
 
 /**
  * Get time until next day tick (in REAL TIME milliseconds)
+ * Uses server-calculated next tick time for accuracy
  * @returns {number} Real-time milliseconds until next day
  */
 export function getTimeUntilNextDay() {
-    const currentGameMs = getCurrentGameTime();
-    const GAME_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in game time
-    const msIntoCurrentDay = currentGameMs % GAME_DAY_MS;
-    const gameTimeRemaining = GAME_DAY_MS - msIntoCurrentDay;
+    if (serverTimeCache.nextTickTime === 0) {
+        // Fallback if server hasn't been synced yet
+        const currentGameMs = getCurrentGameTime();
+        const GAME_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in game time
+        const msIntoCurrentDay = currentGameMs % GAME_DAY_MS;
+        const gameTimeRemaining = GAME_DAY_MS - msIntoCurrentDay;
+        return gameTimeRemaining / 24;
+    }
     
-    // Convert game time to real time (divide by 24 since game runs 24x faster)
-    return gameTimeRemaining / 24;
+    // Use server's next tick time for accuracy
+    const now = Date.now();
+    const timeRemaining = serverTimeCache.nextTickTime - now;
+    return Math.max(0, timeRemaining);
 }
 
 /**

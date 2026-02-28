@@ -107,18 +107,30 @@ function formatGameTime(gameMs) {
 
 /**
  * GET /api/time
- * Returns current game time to client
+ * Returns current game time to client with next tick info
  */
 app.get('/api/time', (req, res) => {
+  const now = Date.now();
   const gameMs = getGameTime();
   const formattedTime = formatGameTime(gameMs);
+  
+  // Calculate next hour boundary
+  const nextHour = new Date();
+  nextHour.setHours(nextHour.getHours() + 1);
+  nextHour.setMinutes(0);
+  nextHour.setSeconds(0);
+  nextHour.setMilliseconds(0);
+  
+  const msUntilNextHour = nextHour.getTime() - now;
   
   res.json({
     success: true,
     gameMs,
     formatted: formattedTime,
     serverRealTime: Date.now(),
-    timeMultiplier: TIME_MULTIPLIER
+    timeMultiplier: TIME_MULTIPLIER,
+    nextTickTime: nextHour.getTime(),
+    msUntilNextTick: msUntilNextHour
   });
 });
 
