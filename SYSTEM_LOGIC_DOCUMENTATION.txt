@@ -1,0 +1,377 @@
+================================================================================
+WARCAMP SIMULATOR - SYSTEM LOGIC & MECHANICS DOCUMENTATION
+================================================================================
+
+This document outlines how each core system works at the logic and mechanics level.
+Created for polish phase to understand existing systems before balance adjustments.
+
+================================================================================
+1. RESOURCE SYSTEM
+================================================================================
+
+SPHERES (Currency)
+- Primary game currency earned through missions and markets
+- Starting amount (Dev): 25,000 S | (Production): 15,000 S
+- Income sources:
+  * Markets: 400 S per day per market (stackable with fabrials)
+  * Scout missions: 500-1,500 S (based on unit carry capacity)
+  * Attack missions: 2,000-5,000 S (with gemheart capture chance at 10%)
+- Spending: Unit recruitment, building construction, gemheart exchange (10,000 S)
+
+GEMHEARTS (Premium Currency)
+- Limited resource obtained through:
+  * Attack raids (10% capture chance)
+  * Plateau runs (1-2 randomly won)
+  * Black market exchange (10,000 S → 1 Gemheart)
+- Uses:
+  * Shardbearer recruitment (1 per unit)
+  * Fabrial construction (1-5 per fabrial type)
+- Value: Very high - limits progression without time or real spending
+
+PROVISIONS (Food/Supplies)
+- Population cap for military units
+- Starting capacity: 150 units
+- Increases by:
+  * +50 per Soulcast Bunker (stackable)
+  * Heatrial fabrials (1.5x multiplier on total cap when owned)
+- Minimal spending: 1 provision per military unit per day (soft cap at upkeep penalties)
+- Critical constraint: Early game bottleneck for army growth
+
+TERRITORY (Land/Control)
+- Starting: 0/50 maximum
+- Increases through conquest missions: 10-25 land per victory
+- Soft cap at 50 - can exceed but building costs increase
+- Strategic gating: More buildings require more territory
+- No direct income source - purely strategic resource
+
+================================================================================
+2. UNIT SYSTEM
+================================================================================
+
+UNIT STATS STRUCTURE:
+Each unit has: Power (combat strength) | Survival (casualty resistance) | Carry 
+(loot capacity) | Speed (mission duration modifier) | Cost | Provision consumption
+
+MILITARY UNITS:
+
+Bridgecrews (Cost: 5 S)
+- Power: 0.1 | Survival: 25% | Carry: 0 | Speed: +0.01 | Provision: 1
+- Role: Trash unit, low value, mainly for padding unit count
+- Use case: Early game fill, speedrun missions
+
+Spearmen (Cost: 10 S)
+- Power: 1.0 | Survival: 75% | Carry: 0 | Speed: 0 | Provision: 1
+- Role: Standard infantry, balanced stats
+- Use case: Core military backbone
+
+Archers (Cost: 15 S)
+- Power: 1.0 | Survival: 90% | Carry: 0 | Speed: 0 | Provision: 1
+- Role: Ranged units, best survival rate
+- Use case: Defensive/casualty-efficient armies
+
+Chulls (Cost: 50 S)
+- Power: 0.5 | Survival: 80% | Carry: 10 | Speed: -0.025 (slows missions) | Provision: 3
+- Role: Transport/loot enabler, requires more provisions
+- Use case: Scout and attack missions where carry capacity matters
+
+Shardbearers (Cost: 1 Gemheart)
+- Power: 2.0x multiplier | Survival: 99% | Carry: 0 | Speed: 0 | Provision: 3
+- Role: Elite unit, massive power boost, extremely rare
+- Use case: Late-game power scaling, high-stakes missions
+- Limitation: Requires gemhearts, gatekeeping resource
+
+SPY UNITS (Separate from military):
+
+Lighteyes Noble (Cost: 50 S)
+- Spy Power: 1 | Survival: 50%
+- Base for espionage operations
+
+Undercity Spy (Cost: 150 S)
+- Spy Power: 2 | Survival: 70%
+- Mid-tier espionage agent
+
+Ghostblood Agent (Cost: 600 S)
+- Spy Power: 5 | Survival: 90%
+- Elite agent, highest impact
+
+
+UNIT UPKEEP TIERS (Soft penalties):
+- 0-200 units: No penalty
+- 201-400 units: Sphere costs increase (tier 2)
+- 401-600 units: Sphere costs increase further (tier 3)
+- 600+ units: Maximum penalty, diminishing returns
+Logic: Encourages diverse unit strategies over giant armies
+
+
+================================================================================
+3. BUILDING SYSTEM
+================================================================================
+
+BUILDING MECHANICS:
+- Costs scale based on quantity owned (exponential/linear)
+- Each provides specific bonuses or unlocks
+- Land costs: Different buildings consume different territory amounts
+- Upkeep: Some buildings cost spheres daily to maintain
+
+INFRASTRUCTURE BUILDINGS:
+
+Spy Network (Cost: 5,000 S | Land: 5 | Max: 1 | Upkeep: 75 S/day)
+- Unlocks: Espionage system and agent recruitment
+- Gating: Must own 1 to access spy missions
+- Strategic: Early investment into espionage path
+
+Research Library (Cost: 10,000 S | Land: 5 | Max: 1)
+- Unlocks: Fabrial system and technology
+- Gating: Must own 1 to construct fabrials
+- Strategic: Required for late-game power scaling
+
+Grand Market (Cost: 250 S | Land: 1 | Scales: Exponential)
+- Income: +400 S/day per market
+- Multiplier: Synchronized Ledger fabrial (1.5x per owned)
+- Economic engine: Primary passive income source
+
+Soulcast Bunkers (Cost: 150 S | Land: 1 | Scales: Exponential)
+- Bonus: +50 Provision capacity per bunker
+- Multiplier: Heatrial fabrial (1.5x total provision cap per owned)
+- Production constraint: Enables larger armies
+
+Military Camp (Cost: 7,000 S | Land: 5 | Scales: Linear)
+- Bonus: +10% army power (per camp)
+- Stackable: Multiple camps stack linearly (+20%, +30%, etc.)
+- Power scaling: Key to late-game military strength
+
+Ardent Monastery (Cost: 7,000 S | Land: 5 | Scales: Linear | Upkeep: 50 S/day)
+- Bonus: +5% survival rate (per monastery)
+- Stackable: Multiple monasteries stack
+- Casualty reduction: Enables missions with lower losses
+
+Stormshelter (Cost: 500 S | Land: 1 | Upkeep: 25 S/day)
+- Defense: Protects 1 building from highstorm destruction (5% per building)
+- Event response: Required for endgame highstorm protection
+- Insurance: Prevents setbacks during storms
+
+The Whisper Tower (Cost: 10 Ghostbloods | Land: 5 | Max: 1)
+- Special: Ultimate spy defense and offense building
+- Requires: Ghostblood agents to build
+- Effect: Provides detection and amplification for spy operations
+- Rarity: Only buildable with premium agents
+
+
+================================================================================
+4. MISSION SYSTEM
+================================================================================
+
+MISSION ARCHITECTURE:
+All missions follow unified deployment pattern:
+1. Open deployment modal → 2. Select units → 3. Confirm deploy → 
+4. Mission appears in active list → 5. View mission details → 
+6. Mission completes → 7. Result modal shows outcome
+
+MISSION TYPES:
+
+SCOUT MISSION (Cyan | ~1 Day)
+- Cost: None (free to deploy)
+- Mechanics: 
+  * Carry score = sum(unit carry values) × Loot Bonus % 
+  * Reward: 500-1,500 S based on carry
+  * Casualties: 5-10% on success, 20% on failure
+- Strategy: Maximize carry capacity (chulls) for better rewards
+
+ATTACK MISSION (Red | ~1.5 Days)
+- Cost: None
+- Mechanics:
+  * Power calculation: sum(unit power) + Training Camp bonus + Shardbearer multiplier
+  * Reward: 2,000-5,000 S
+  * Gemheart: 10% random capture chance on victory
+  * Casualties: 10-15% on success, 30% on failure
+- Strategy: Power race, maximize shardbearers for consistency
+
+PLATEAU RUN (Orange | ~2 Days | Coalition Event)
+- Cost: None
+- Mechanics:
+  * Coalition: Multiple players compete simultaneously
+  * Winner determination: Speed (duration) and power
+  * Reward: Shared loot + potential gemheart to winner
+  * Casualties: 40% (highstorm causes massive losses)
+- Strategy: Speed multiplication from fabrials, power for competition
+- Event driven: Triggers randomly every 3-5 in-game days
+
+CONQUEST MISSION (Cyan | 1 Day)
+- Cost: 200 S + 100 Provisions
+- Mechanics:
+  * Enemy power: 80 + (maxLand - 50) × 2.5
+  * Victory determination: playerPower / (playerPower + enemyPower) = win chance
+  * Land reward: 10-25 (based on victory margin)
+  * Casualties: 8-15% victory, 25-35% defeat
+- Strategy: Territory exponential growth, expanding cap-gating
+
+ESPIONAGE MISSION (Purple | Variable)
+- Cost: None (agent cost already paid)
+- Mechanics:
+  * Agent power: sum(agent spy values)
+  * Success chance: Agent power vs target defense
+  * Target: Choose from 3 NPC princes (each has different stats)
+  * Operations: Scan (info), Steal (resources), Sabotage (damage)
+  * Risk: Agent capture on failure, growing suspicion
+- Strategy: Counter-intel system, suspicion management
+
+
+MISSION COMPLETION LOGIC:
+
+1. Time-based: Each mission has returnTime = duration × speed modifiers
+2. Casualty calculation: 
+   - Base casualty % from mission type
+   - Modified by Monastery bonus + Survival rates
+   - Highstorm doubles casualty rates
+3. Reward calculation: Mission-type specific math
+4. Return: Forces available again when mission complete
+
+
+================================================================================
+5. UPKEEP & PENALTY SYSTEM
+================================================================================
+
+DAILY UPKEEP COSTS:
+- Stormshelter: 25 S each per day
+- Monastery: 50 S each per day (if built)
+- Spy Network: 75 S per day (if built)
+- Unit provisions: Minimal (included in provision tracking)
+
+UNIT UPKEEP PENALTIES (Sphere cost multipliers):
+Tier 1 (0-200 units): No penalty (100% costs)
+Tier 2 (201-400 units): 120% costs
+Tier 3 (401-600 units): 150% costs
+Tier 4 (600+ units): 200% costs
+
+Logic: Forces strategic balance between unit quantity and economic sustainability
+
+
+================================================================================
+6. HIGHSTORM SYSTEM
+================================================================================
+
+RANDOM EVENT with cascading effects:
+
+PHASES:
+1. Announcement: 10 second full-screen overlay
+2. Warning: 10 seconds to 10 minutes (top banner, clickable)
+3. Persistent: 10 minutes to end (small banner)
+
+EFFECTS:
+
+Army Casualties:
+- 20-25% to deployed forces
+- 40% to plateau run participants
+- Chull protection: -5% per chull (max 50% reduction)
+
+Building Destruction (5% chance each):
+- Markets and Soulcast Bunkers at risk
+- Stormshelters provide 1 protection each
+- Requires rebuild via Logistics
+
+Fabrial Overcharge:
+- 60% chance: 3x speed boost (Gravity Rigs), 2x use (Arena fabrials)
+- 40% chance: Burnout (Gravity Rigs disabled, random arena fabrial destroyed)
+- Duration: 3 days
+
+Spy Chaos: +2x spy power for 24 hours
+
+Black Market Discount: 10,000 S → 7,500 S for 48 hours
+
+Mitigation: Mission recall (50% cost of remaining time)
+
+
+================================================================================
+7. FABRIALS (MAGITECH SYSTEM)
+================================================================================
+
+FABRIALS are technology multipliers built after Research Library unlocked.
+Require Gemhearts (premium currency) - major gating mechanism.
+
+INFRASTRUCTURE FABRIALS:
+
+Heatrial System (Cost: 3 Gemhearts)
+- Bonus: 1.5x total Provision cap multiplier (stackable)
+- Formula: base_cap × (1.5 ^ quantity_owned)
+- Impact: Enables exponential army growth with ownership
+
+Synchronized Ledger (Cost: 3 Gemhearts)
+- Bonus: 1.5x Market income (stackable)
+- Formula: (400 × markets) × (1.5 ^ quantity_owned)
+- Economic multiplier: Passive income acceleration
+
+Gravity-Spanning Rig (Cost: 5 Gemhearts)
+- Bonus: 2.0x Army speed/mission duration reduction (stackable)
+- Formula: duration / (2.0 ^ quantity_owned)
+- Impact: Missions complete in half time, enables faster rotations
+
+ARENA FABRIALS (Combat-specific):
+
+Regeneration Plate (Cost: 1 Gemheart)
+- Bonus: +1 Champion HP healing (once per day, manual)
+- Champion-only system
+
+Thrill Amplifier (Cost: 2 Gemhearts)
+- Bonus: Trade 1 HP for +3 Thrill in combat (once per day)
+- Arena-only mechanic
+
+Half-Shard (Cost: 4 Gemhearts)
+- Bonus: Block one attack in combat (once per day)
+- Defensive arena tool
+
+Logic: Fabrials are long-term investments, require planning
+
+
+================================================================================
+8. PLAYER PROGRESSION SYSTEM
+================================================================================
+
+GATING PROGRESSION:
+Start → Research Library Unlock → Fabrials Accessible → 
+Territory Expansion → Equipment Unlock → End-game Scaling
+
+PRESSURE POINTS (Where progression slows):
+1. Early: Provision cap (requires Soulcast Bunkers)
+2. Mid: Gemheart scarcity (limits fabrial access)
+3. Late: Land expansion (conquest gets progressively harder)
+4. End-game: Gemheart income (plateaus, farming intensifies)
+
+
+================================================================================
+9. TIME MECHANICS
+================================================================================
+
+DAY CYCLE:
+- Dev mode: 10 seconds = 1 day
+- Production: 1 hour = 1 day
+- Predictable for testing, meaningful for players
+
+MISSION DURATION CALCULATION:
+base_duration × speed_multiplier × (1 / gravity_rig_multiplier) = actual_hours
+Example: Scout (1 day) × 1.0 × (1 / 2.0 with rig) = 12 hours
+
+Time gates progression, forces strategic deployment timing
+
+
+================================================================================
+10. BALANCE FRAMEWORK
+================================================================================
+
+CORE BALANCE DIMENSIONS:
+
+Resource Scarcity: Spheres < Provisions < Gemhearts (least scarce to most)
+Progression Time: Early access to abundance, mid-game rationing
+Power Scaling: Linear (buildings) vs Exponential (fabrials)
+Decision Points: Unit composition, building prioritization, mission selection
+
+TENSION POINTS REQUIRING BALANCE:
+- Too many spheres = game too easy, fabrials not valued
+- Too few gemhearts = progression frustrating, whales only
+- Unit costs vs provision cap = early game gate
+- Mission rewarding vs duration = time investment ROI
+- Casualty rates = high-risk strategy viability
+
+
+================================================================================
+END OF SYSTEM LOGIC DOCUMENTATION
+================================================================================

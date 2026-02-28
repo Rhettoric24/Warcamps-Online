@@ -1,0 +1,645 @@
+================================================================================
+PURCHASABLE ITEMS: BALANCE & STAT ANALYSIS SHEET
+================================================================================
+
+GENERATED FOR: Warcamps Online Polish Phase
+PURPOSE: Comprehensive review of all purchasable units, buildings, and fabrials
+         to identify balance issues and optimization opportunities
+
+
+================================================================================
+SECTION 1: MILITARY UNITS COMPARATIVE TABLE
+================================================================================
+
+UNIT COMPARISON MATRIX (Cost Efficiency Analysis)
+─────────────────────────────────────────────────────────────────────────────
+
+Unit Type        | Cost  | Power | Survival | Carry | Speed    | Provisions | Cost/Power
+─────────────────────────────────────────────────────────────────────────────
+Bridgecrews      | 5 S   | 0.1   | 25%      | 0     | +0.01    | 1          | 50.0
+Spearmen         | 10 S  | 1.0   | 75%      | 0     | 0        | 1          | 10.0
+Archers          | 15 S  | 1.0   | 90%      | 0     | 0        | 1          | 15.0
+Chulls           | 50 S  | 0.5   | 80%      | 10    | -0.025   | 3          | 100.0
+Shardbearers     | 1 GH  | 0 base| 99%      | 0     | 0        | 3          | 2.0x multiplier
+Noble (Spy)      | 50 S  | 1.0   | 50%      | 0     | 0        | 2          | 50.0 (espionage only)
+Spy Agent        | 150 S | 2.0   | 70%      | 0     | 0        | 2          | 75.0 (espionage only)
+Ghostblood       | 600 S | 5.0   | 90%      | 0     | 0        | 3          | 120.0 (espionage only)
+
+─────────────────────────────────────────────────────────────────────────────
+
+UNIT ANALYSIS & BALANCE NOTES:
+─────────────────────────────────────────────────────────────────────────────
+
+KEY MISSION MECHANIC (Essential Context):
+  • Mission reward formula: baseSpheres × (1 + carry * 0.01)
+  • Mission duration formula: baseDays / (speedMultiplier)
+  • Scout: 500-1000 S base | 1 day base duration | 2% casualty rate
+  • Attack: 500-1500 S base | 1.5 day base duration | 10% casualty rate | 15% Gemheart chance
+  • Carry bonus: Each carry point = +1% mission reward
+  • Speed bonus: Each speed point = +1% mission completion rate = More missions/day = More Gemhearts/day
+
+✓ STRATEGIC UNITS (Well-Designed):
+
+  1. BRIDGECREWS (5 S, +0.01 speed per unit):
+     - ROLE: Speed farming for Gemhearts
+     - MECHANIC: Each 100 Bridgecrews = 1.0 speed bonus = missions complete 2x faster
+     - ECONOMY: 100 Bridgecrews cost only 500 S to recruit
+     - STRATEGIC VALUE: With 100 Bridgecrews, attack missions finish in 45 mins (dev time) instead of 
+       90 mins = 2x more missions/day = 2x faster Gemheart farming
+     - SYNERGY: Add Gravity Lift fabrial (5 GH, 2x speed) = massive speedup
+     - FARMER LOADOUT: 100 Bridgecrews + 10 Spearmen + 10 Chulls = fast, profitable attacks
+     - RECOMMENDATION: ✓ WELL-BALANCED. Central to Gemheart economy.
+  
+  2. CHULLS (50 S, 10 carry per unit):
+     - ROLE: Mission profit multiplier
+     - MECHANIC: 10 carry = +10% mission rewards across ALL mission types
+     - ECONOMY: Cost 50 S per Chull, adds 50-150 S per attack mission (pay for itself in 1-3 attacks)
+     - EXAMPLE: Scout without carry: 500-1000 S. Scout with 1 Chull: 550-1100 S. (+50-100 S gain)
+     - SYNERGY: More carry = more profit per mission = better sphere income
+     - FARMER LOADOUT: Same 100 Bridgecrews + 10 Spearmen + 10 Chulls gives +10% loot on every attack
+     - SPEED PENALTY: -0.025 per Chull is small (100 Chulls = -2.5 speed) and worth the carry
+     - RECOMMENDATION: ✓ WELL-BALANCED. Efficient profit multiplier for farming playstyle.
+  
+  3. SPEARMEN (10 S, 1.0 power):
+     - ROLE: Efficient base unit for farming missions
+     - MECHANIC: Cheapest power source (10 S per power point)
+     - MISSION CONTEXT: Attacks need ~50 power to beat enemy (50-100 range). 50 Spearmen = 500 S investment
+     - ECONOMY: Lowest cost-to-power = default farming unit
+     - RECOMMENDATION: ✓ WELL-BALANCED. Backbone of farming armies.
+
+⚠ QUESTIONABLE BALANCE:
+
+  1. ARCHERS (15 S, 1.0 power, 90% survival):
+     - ISSUE: 50% more expensive than Spearmen for 15% better survival
+     - MISSION CONTEXT: In mission economy where power > enemy suffices, survival doesn't matter
+       (Attacks: player power vs ~50-100 enemy, Spearmen 75% survival still fine)
+     - STRATEGIC WEAKNESS: No unique role. Just "expensive Spearmen"
+     - COMPARISON: 100 Archers (1500 S) vs 100 Spearmen (1000 S) = +5% survival for +500 S cost
+     - That 500 S buys: 100 Bridgecrews (2x speed!) OR 10 Chulls (+10% profit!)
+     - RECOMMENDATION: CONSIDER reducing to 12 S (40% markup instead of 50%) OR give unique bonus
+       (e.g., "vs armored foes" bonus in future PvP system)
+     - CURRENT STATUS: Underpowered compared to strategic alternatives
+
+  2. SHARDBEARERS (1 Gemheart, 2.0x power multiplier per unit):
+     - MECHANIC: Each Shardbearer multiplies TOTAL army power by 2.0
+     - EXAMPLE: 50 Spearmen = 50 power. Add 1 Shardbearer = (50 + 0) * 2.0 = 100 power
+     - EXAMPLE: 50 Spearmen + 2 Shardbearers = 50 * 3.0 = 150 power (multiplicative stacking)
+     - COST: 1 Gemheart per Shardbearer = EXTREME gating (Gemhearts are scarcest resource)
+     - STRATEGIC VALUE: "Late-game power spike" / "Gemheart sink"
+     - ECONOMY QUESTION: Is 2.0x worth 1 GH? Let's compare:
+       • 1 GH = 10,000 S at black market exchange
+       • Alternative: Buy 10,000 S of Spearmen (1000 Spearmen) = 1000 power instead of 2x multiplier
+       • 1 Shardbearer 2x multiplier only breaks even vs raw Spearmen if you have 5000+ power already
+     - RECOMMENDATION: WELL-DESIGNED. Shardbearers are correctly rare/expensive. They're for endgame
+       power multiplication when you already have large armies.
+
+✗ UNDERPOWERED UNITS:
+
+  1. NOBLES (50 S, 50% survival):
+     - ISSUE: 50% survival is lowest in entire game
+     - COMPARISON: Same cost as Chull (50 S) but Chull has 80% survival + 10 carry bonus
+     - PROBLEM: For espionage missions, 50% survival means constant agent casualties
+     - RECOMMENDATION: Increase to 65% survival OR reduce cost to 30 S
+
+ESPIONAGE UNITS (Separate economy - checked vs espionage mission mechanics):
+  • Spy Agent (150 S): Reasonable middle-tier option for espionage
+  • Ghostblood (600 S): Premium espionage unit, 90% survival justified for cost tier
+
+UNIT BALANCE SUMMARY:
+─────────────────────────────────────────────────────────────────────────────
+✓ Well-designed & Strategic: Bridgecrews (speed farming), Chulls (profit multiplier), Spearmen (base unit)
+✓ Correctly Gated: Shardbearers (expensive for endgame power, appropriately Gemheart-locked)
+⚠ Needs Minor Adjustment: Archers (underpowered vs alternatives, no unique role)
+✗ Underpowered: Nobles (50% survival too low for cost)
+
+
+================================================================================
+SECTION 2: BUILDINGS COMPARATIVE TABLE
+================================================================================
+
+BUILDING COST & BENEFIT ANALYSIS
+─────────────────────────────────────────────────────────────────────────────
+
+Building          | Base Cost | Effect/Income    | Upkeep   | Max | Land | Unlock
+─────────────────────────────────────────────────────────────────────────────
+Soulcaster        | 150 S     | +50 provision    | Free     | ∞   | 1    | Start
+Market            | 250 S     | +400 S/day       | Free     | ∞   | 1    | Start
+Stormshelter      | 500 S     | Protect 1 bldg   | 25 S/day | ∞   | 1    | Start
+Training Camp     | 7,000 S   | +10% power       | Free     | ∞   | 5    | Start
+Monastery         | 7,000 S   | +5% survival     | 50 S/day | ∞   | 5    | Start
+Spy Network       | 5,000 S   | Unlock spies     | 75 S/day | 1   | 5    | Gate
+Research Library  | 10,000 S  | Unlock fabrials  | Free     | 1   | 5    | Gate
+Whisper Tower     | 10 Ghosts | Ultimate spy     | Free     | 1   | 5    | Gate
+
+─────────────────────────────────────────────────────────────────────────────
+
+BUILDING-BY-BUILDING ANALYSIS:
+─────────────────────────────────────────────────────────────────────────────
+
+INCOME BUILDINGS (Primary economic engines):
+──────────────────────────────────────────────
+
+✓ MARKET (250 S, +400 S/day):
+  - ROI: Payback in 0.6 days (~14 hours in dev mode)
+  - Income source: Passive daily income, NOT from missions
+  - Strategic: "Minimum viable farming." 1 market covers basic upkeep costs
+  - With Ledger fabrial (1.5x multiplier): +400 → +600 S/day
+  - Scaling: Infinite. Build as many as you want (sky's the limit)
+  - RECOMMENDATION: ✓ WELL-BALANCED. Rush these early, especially with Ledger.
+
+✓ SOULCASTER (150 S, +50 provision cap):
+  - ROI: Depends on army size (indirect value)
+  - Strategic: Army cap = deployment scale. More soldiers = bigger armies
+  - Synergy: With Heatrial fabrial (1.5x provision multiplier): +50 → +75 provision cap
+  - Example: 5 Soulcasters + Heatrial = 375 + 50 base = 425 provision pool
+  - Economic value: More provision = bigger armies = more mission power = more rewards
+  - RECOMMENDATION: ✓ WELL-BALANCED. Essential for army-cap farming.
+
+MISSION FARMING OPTIMIZATION (Buildings that multiply mission efficiency):
+───────────────────────────────────────────────────────────────────────────
+
+⚠ TRAINING CAMP (7,000 S, +10% power):
+  - COST: Extremely high (28x a Market)
+  - EFFECT: +10% to all unit power (stacking: 2 camps = +20%, etc.)
+  - MISSION CONTEXT: Energy spent on +10% power could instead buy:
+    • 280 Spearmen (1400 S remaining)
+    • Or 70 Markets (1000 S remaining + perpetual income)
+  - PROBLEM: +10% power is passive/invisible vs buying 280 Spearmen (+280 power)
+  - WHERE IT MATTERS: Late-game when you already have 1000+ power armies
+    (where +10% = +100 power worth having)
+  - EARLY GAME: Terrible investment (better to buy units)
+  - RECOMMENDATION: BALANCE IS OK for endgame, but feels "trap" for early players. 
+    Consider adding visual feedback showing the +10% boost so it feels impactful.
+
+⚠ MONASTERY (7,000 S, +5% survival, 50 S/day upkeep):
+  - COST: Same as Training Camp (extremely high)
+  - EFFECT: +5% to all unit survival rate (stacking multiplier)
+  - PROBLEM: In farming missions (attack vs enemy power 50-100), survival barely matters
+    (Just need power > enemy. Spearmen 75% → +5% = 80% doesn't meaningfully change outcomes)
+  - UPKEEP: 50 S/day ongoing = 18,250 S lifetime cost (to break even takes forever)
+  - WHERE IT MATTERS: PvP combat where every % helps OR espionage where casualties matter
+  - EARLY GAME: Terrible investment (no measurable benefit)
+  - RECOMMENDATION: UNDERPOWERED. Either:
+    a) Reduce cost to 3,500 S (half current cost)
+    b) Increase bonus to +10% survival (2x current)
+    c) Reduce upkeep to 25 S/day or make it free
+    Current design most valuable to experienced players doing PvP.
+
+SPECIALIZED BUILDINGS:
+──────────────────────
+
+✓ STORMSHELTER (500 S, protect 1 building, 25 S/day upkeep):
+  - COST: Moderate (2x Market), scales with storms mechanic
+  - EFFECT: "Insurance" against building destruction during highstorms
+  - VALUE CALCULATION: Is giving up 25 S/day worth protecting a Market (400 S/day)?
+    Answer: YES if storm happens every ~20 days. At current highstorm frequency, YES.
+  - RECOMMENDATION: ✓ WELL-BALANCED. Situational but important.
+
+✓ SPY NETWORK (5,000 S, unlock espionage, max 1, 75 S/day upkeep):
+  - COST: Moderate gating cost for entire espionage system
+  - EFFECT: Enables all spy missions (gather intel, sabotage, defense)
+  - UPKEEP: 75 S/day is ~5 Markets of daily income requirement
+  - STRATEGIC: Avoids forcing espionage on all players (opt-in system)
+  - RECOMMENDATION: ✓ WELL-BALANCED. Good gating on optional system.
+
+✓ RESEARCH LIBRARY (10,000 S, unlock fabrials, max 1, NO upkeep):
+  - COST: Highest non-Whisper building (40x Market)
+  - EFFECT: Unlocks ENTIRE fabrial system (multipliers, arena equipment)
+  - FABRIALS ENABLE: 2x speed farming, 2x profit, 1.5x survivability, arena advantages
+  - NO UPKEEP: Smart design (unlocking system shouldn't be punishing)
+  - INVESTMENT: Expensive but enables whole playstyle
+  - RECOMMENDATION: ✓ WELL-BALANCED. High cost reflects enabling major system.
+
+✗ WHISPER TOWER (10 Ghostbloods, ultimate spy building, max 1):
+  - COST: Extreme (10 Ghostbloods = 6,000 S equivalent in agent recruitment costs)
+  - EFFECT: Unknown from stats sheet ("Ultimate spy defense & offense")
+  - PROBLEM: Cannot evaluate without knowing exact mechanics
+  - LAND COST: 5 (expensive for single building)
+  - UPKEEP: None (suspicious - should cost something for ultimate building)
+  - RECOMMENDATION: UNCLEAR. Need to verify:
+    a) Does it do something proportional to 6,000-sphere equivalent cost?
+    b) Should it have upkeep like Spy Network?
+    c) If it's truly "ultimate," why no upkeep?
+
+BUILDING BALANCE SUMMARY:
+─────────────────────────────────────────────────────────────────────────────
+✓ Well-designed: Market, Soulcaster, Stormshelter, Spy Network, Research Library
+⚠ Needs tuning: Training Camp (feels like trap early, OK late), Monastery (too expensive relative to effect)
+⚠ Needs clarification: Whisper Tower (mechanics unclear relative to cost)
+
+
+================================================================================
+SECTION 3: FABRIALS COMPARATIVE TABLE
+================================================================================
+
+FABRIAL SYSTEM: MULTIPLIER GEMS
+─────────────────────────────────────────────────────────────────────────────
+
+Fabrial Name      | Cost  | Effect Category        | Multiplier/Effect
+─────────────────────────────────────────────────────────────────────────────
+MISSION FABRIALS:
+Heatrial          | 3 GH  | Logistics Buffer       | 1.5x provision cap
+Ledger            | 3 GH  | Income Multiplier      | 1.5x market income
+Gravity Lift      | 5 GH  | Mission Accelerator    | 2.0x mission speed
+
+ARENA FABRIALS (Champion combat only):
+Regen Plate       | 1 GH  | Champion Healing       | Full heal (1/day)
+Thrill Amp        | 2 GH  | Arena Power Trade      | +2 Thrill, -1 HP per win
+Half-Shard        | 4 GH  | Arena Defense          | Reduce damage x0.5
+
+─────────────────────────────────────────────────────────────────────────────
+
+FABRIAL ANALYSIS & BALANCE NOTES:
+─────────────────────────────────────────────────────────────────────────────
+
+CONTEXTUAL METAGAME:
+  Two farming strategies emerge:
+  1. SPEED FARM: Bridgecrews (speed bonus) + Gravity Lift (2x speed) = 4-6x mission speed
+     → Complete missions in 15-45 mins instead of 90 mins = 4x more missions/day = 4x Gemhearts
+  2. PROFIT FARM: Chulls (carry) + Ledger (2x income) = +20% mission rewards
+     → More spheres per mission = more resources for next mission
+
+MISSION FABRIALS - STRATEGIC VALUE:
+───────────────────────────────────
+
+✓ GRAVITY LIFT (5 GH, 2.0x mission speed):
+  - MECHANIC: Cuts mission duration in half (or to 1/3 with boost)
+  - STRATEGIC IMPACT: Massive efficiency multiplier for farming
+  - EXAMPLE: Normal attack mission takes 1.5 days. With Gravity Lift: 45 minutes (dev time)
+    = 32 missions/day instead of 16 missions/day = 2x Gemheart generation speed
+  - SYNERGY: Stacks with Bridgecrews (can go 4-6x speed combo!)
+  - BUILD ORDER: Research Library → Gravity Lift = TOP PRIORITY (enables speed farming)
+  - COST vs VALUE: 5 GH is expensive, but enables entire speed-farm playstyle
+  - RECOMMENDATION: ✓ WELL-BALANCED. Mission speed multiplier is powerful enough to justify cost.
+
+✗ LEDGER (3 GH, 1.5x market income):
+  - MECHANIC: All Markets produce +50% income (400 → 600 S/day per Market)
+  - PROBLEM: Income from Markets is passive/indirect vs Gemheart sources
+  - ROI ANALYSIS: 3 GH = 30,000 S equivalent at exchange rate
+    • With 1 Market: +200 S/day income = 150 days to break even (!)
+    • With 5 Markets: +1000 S/day income = 30 days to break even
+    • With 10 Markets: +2000 S/day income = 15 days to break even
+  - CONTEXT: Early game players won't have 10 markets for a while
+  - WHEN VALUABLE: Late-game when you have 10+ markets (generates perpetual income)
+  - EARLY GAME: Terrible investment (break-even takes too long)
+  - COMPARISON: Spend 3 GH on Gravity Lift (2x speed farm = 2x more missions = more direct GH gain)
+    vs Ledger (passive income multiplier with slow ROI)
+  - RECOMMENDATION: ⚠ SITUATIONAL. Re-evaluate cost:
+    a) Reduce to 1-2 GH (makes early-game viable), OR
+    b) Increase to 2.0-2.5x multiplier (faster ROI on investment)
+    Current: Best for late-game wealthy players, terrible for progression players
+
+⚠ HEATRIAL (3 GH, 1.5x provision cap):
+  - MECHANIC: Multiply all provision cap by 1.5x
+    • Without Heatrial: 150 base + (50 per Soulcaster)
+    • With Heatrial: (150 base + (50 per Soulcaster)) × 1.5
+    • Example: Base 150 + 5 Soulcasters (250) = 400 total, then × 1.5 = 600 provisions
+  - STRATEGIC VALUE: Larger provision pool = bigger armies = more mission power
+  - COMPARISON TO LEDGER: Same cost (3 GH) but different value type
+    • Ledger: +50% passive income (long-term)
+    • Heatrial: More army cap NOW (direct power increase)
+  - SYNERGY: More provisions = can run bigger armed missions = more rewards
+  - WHEN VALUABLE: When you're provision-capped and want bigger armies
+  - RECOMMENDATION: ✓ REASONABLE. Direct army expansion vs passive income makes it more useful than Ledger.
+
+ARENA FABRIALS - SEPARATE ECONOMY (Need detailed arena mechanic analysis):
+─────────────────────────────────────────────────────────────────────────
+
+  • REGEN PLATE (1 GH, heal champion daily):
+    - Cost: Only 1 GH (cheapest fabrial)
+    - Effect: Full heal once per day
+    - VALUE: Need to understand arena's damage-per-fight to evaluate
+    - CONCERN: If arena fights regularly hit max damage, this is essential (valuable)
+      If arena fights rarely go to full duration, this is trap (worthless)
+    - RECOMMENDATION: NEEDS TESTING. Can't evaluate without knowing arena difficulty.
+  
+  • THRILL AMP (2 GH, +2 Thrill, -1 HP per win):
+    - Mechanic: Trade-off between power boost and durability
+    - VALUE: Depends entirely on how valuable "Thrill" stat is in arena
+    - RECOMMENDATION: NEEDS TESTING. Requires understanding arena economy.
+  
+  • HALF-SHARD (4 GH, 0.5x damage reduction):
+    - Cost: Expensive (4 GH)
+    - Effect: Halve incoming damage (major durability buff)
+    - VALUE: In arena, if 0.5x damage = doubles survival, this is powerful
+    - COMPARISON COST: 4 GH is same as Gravity Lift (5 GH). Is arena durability worth slightly less speed?
+    - RECOMMENDATION: POSSIBLY OVERPRICED if damage mitigation is strong (0.5x damage = huge survivability)
+      Could reduce to 2-3 GH.
+
+FABRIAL BALANCE SUMMARY:
+─────────────────────────────────────────────────────────────────────────────
+✓ Well-designed: Gravity Lift (powerful speed multiplier, justifies cost for speed farming)
+✓ Reasonable: Heatrial (direct army expansion, useful at progression point)
+⚠ Needs tuning: Ledger (ROI too slow for early/mid game, only useful for wealthy endgame)
+⚠ Needs testing: Arena Fabrials (can't evaluate without understanding arena economy)
+
+
+================================================================================
+SECTION 4: RESOURCE ECONOMY BALANCE REVIEW
+================================================================================
+
+RESOURCE FLOW RATES (Dev Mode - 10 second days):
+─────────────────────────────────────────────────────────────────────────────
+
+Starting Resources:
+  • Spheres: 25,000 S (dev)
+  • Gemhearts: 10 GH (dev)
+  • Provisions: 150
+  • Territory: 0/50
+
+Daily Income Sources:
+  • Base market income: 0 S/day (must build Market = +400 S/day each)
+  • Gemheart sources: 10% of attack raids ONLY, plateau runs (coalition), exchange 10 GH = 10,000 S
+  • Provision sources: +50 per Soulcaster Bunker (expires with death/mission)
+
+GEMHEART SCARCITY ANALYSIS:
+───────────────────────────────────────────────────────────────────────────
+Problem: Gemhearts are 10x scarcer than Spheres
+  - Only 3 obtainable ways: Raid drops (10% chance), Plateau runs, Market exchange (10,000 S)
+  - All fabrials require 1-5 Gemhearts
+  - All high-tier spy units require Gemhearts (Shardbearers = 1 GH each)
+  - All arena fabrials require Gemhearts
+
+Implication: Players will face "GH bottleneck" around mid-game
+  - Can't afford everything that costs Gemhearts
+  - Must choose between: fabrials vs. Shardbearers vs. arena equipment
+
+Recommendation: CHECK that this is intentional gating design.
+  If you want Gemhearts scarce for challenge: STATUS QUO is good.
+  If you want Gemhearts more accessible: Consider increasing raid drop to 15% or
+  adding more plateau run frequency.
+
+SPHERE ECONOMY ANALYSIS:
+────────────────────────
+Income sources (Dev mode testing):
+  • Market: 400 S/day per Market (easy to scale)
+  • Scout mission: 500-1,500 S (1 day mission)
+  • Attack mission: 2,000-5,000 S (1.5 day mission)
+  • Conquest mission: Returns cost only, uses 200 S + 100 provision as cost
+  • Plateau run: Shared loot, variable (2 day mission)
+
+Spending sinks:
+  • Unit recruitment: 5-600 S per unit (scaling)
+  • Building construction: 150-10,000 S (one-time per type)
+  • Upkeep: 25-75 S/day per building
+  • Conquest cost: 200 S + 100 provision per conquest attempt
+
+Assessment: Sphere income feels abundant for mid-game (Markets scale well)
+  Recommendation: BALANCED. Players should have constant sphere income to spend.
+
+
+PROVISION ECONOMY ANALYSIS:
+────────────────────────────
+Starting: 150 provisions
+  • Each unit costs 1-3 provisions per recruitment (one-time)
+  • Army size determines provision "cap" (200-unit cap=200 provisions used)
+  • Soulcasters increase cap: +50 per bunker
+  • Heatrial multiplier: 1.5x cap total
+
+Problem: Unclear if provisions gate army size or just add flavor cost
+  - If provisions are HARD CAP on army: This matters a lot (balance critical)
+  - If provisions are SOFT mechanic: Less critical but still important
+
+Recommendation: CLARIFY in UI whether provisions are:
+  • Hard cap (can't recruit more units if at provision limit)
+  • Soft penalty (upkeep cost increase if over cap)
+  Either way, current design works but needs clearer communication.
+
+
+TERRITORY ECONOMY ANALYSIS:
+───────────────────────────
+Starting: 0/50 territory
+  • Each conquest: +10-25 territory per success
+  • Land cost: Buildings require 1-5 land each
+  • Max capacity: 50 territory
+
+Problem: Land seems abundant (50 total allows ~8-10 buildings)
+  - Most players won't hit territory cap
+  - Conquest feels like "endgame expansion" not "early-game bottleneck"
+
+Recommendation: Either:
+  • Increase building land costs (make land more contested)
+  • Decrease territory rewards per conquest (make expansion slower)
+  • Increase territory cap (if abundance is intentional)
+  As-is: Territory cap is not a binding constraint for most players.
+
+
+================================================================================
+SECTION 5: OVERALL BALANCE RECOMMENDATIONS (Priority Order)
+================================================================================
+
+SYSTEM ASSESSMENT:
+─────────────────────────────────────────────────────────────────────────────
+After careful analysis of mission mechanics and the carry/speed economy:
+
+THE GAME DESIGN IS WELL-CONCEIVED. There are emergent farming strategies:
+  • Speed Farm: Bridgecrews + Gravity Lift = 4-6x mission frequency = fast Gemheart generation
+  • Profit Farm: Chulls + Ledger = +20% mission rewards = sphere efficiency
+  • Power Farm: Shardbearers + Training Camp = raw military scaling = conquest dominance
+
+These strategies require different unit/building/fabrial combinations, creating
+meaningful economic decisions. The design WORKS once you understand carry/speed mechanics.
+
+WHAT NEEDS ADJUSTMENT:
+─────────────────────────────────────────────────────────────────────────────
+
+PHASE 1 - PRIORITY BALANCE TWEAKS (Low effort, clarify player experience):
+───────────────────────────────────────────────────────────────────────────
+
+1. [BALANCE] ARCHERS (15 S) - GIVE UNIQUE ROLE
+   Current: Boring (just more-expensive Spearmen)
+   Problem: No reason to buy these vs Spearmen for farming
+   Recommendation: Add unique mechanic, e.g.:
+     a) Bonus damage vs armored enemies (futuristic content)
+     b) Ranged mechanic: "15% chance attacks defeat enemy with 0 casualties"
+     c) Special mission: Archers get +2% Gemheart drop chance
+   Benefit: Makes Archers a strategic choice, not just "expensive Spearmen"
+
+2. [BALANCE] NOBLES (50 S) - INCREASE SURVIVAL
+   Current: 50% survival (lowest in game, dies constantly)
+   Problem: Too fragile for 50 S cost (Chulls are better value)
+   Recommendation: Increase to 65-70% survival
+   Benefit: Makes early espionage recruitment viable without constant losses
+
+3. [CLARITY] ADD TOOLTIP EXPLANATIONS
+   Current: Players don't understand carry bonus or speed bonus without reading code
+   Recommendation: Add UI tooltips showing:
+     • "Carry: +1% mission rewards per point"
+     • "Speed: Faster mission completion (2 missions/day instead of 1)"
+     • "Power: Army damage output vs enemy"
+   Benefit: New players understand strategic value of Bridgecrews/Chulls immediately
+
+PHASE 1.5 - IF ECONOMY FEELS OFF IN PLAYTESTING:
+───────────────────────────────────────────────
+
+4. [OPTIONAL] MONASTERY (7,000 S) - REDUCE COST OR INCREASE EFFECT
+   Current: Feels like trap investment early game (+5% survival doesn't matter vs cheap units)
+   Recommendation: Either:
+     a) Reduce cost to 3,500 S (half), or
+     b) Increase to +10% survival, or
+     c) Add secondary effect (e.g., "units cost 5% less provisions")
+   Only do if playtesters feel it's underpowered
+
+5. [OPTIONAL] LEDGER (3 GH) - REDUCE COST FOR EARLY ACCESS
+   Current: 150+ day ROI makes it late-game only
+   Recommendation: Reduce to 1-2 GH (or increase mult to 2.0x)
+   Only do if Ledger should be reachable for mid-game players
+
+PHASE 2 - IF ARENA BALANCE IS NEEDED:
+────────────────────────────────────
+
+6. [TESTING] VALIDATE ARENA FABRIALS
+   Current: Cost can't be evaluated without knowing arena damage/economy
+   Action: Playtest 20+ arena duels with/without each fabrial
+   Then: Analyze if pricing matches game impact
+
+WHAT IS ACTUALLY WORKING WELL:
+─────────────────────────────────────────────────────────────────────────────
+
+✓ GAME DESIGN STRENGTHS (Keep these):
+
+  • Bridgecrews strategic role: Speed farming is viable and interesting strategy
+  • Chulls strategic role: Profit farming creates alternative playstyle
+  • Shardbearers as Gemheart sink: Endgame power scaling with scarcity gates
+  • Market economy: Perfect early-game income source, scalable forever
+  • Mission reward formula: Carry bonus creates meaningful unit composition decisions
+  • Gating systems: Spy Network/Research Library unlock systems without forcing them
+
+✓ EMERGENT PLAYER STRATEGIES:
+
+  New players will naturally discover (or fail to discover):
+  1. Speed farmers: "Why are my missions so slow?" → Add Bridgecrews → "Much faster!"
+  2. Profit farmers: "How do I get more sphere rewards?" → Add Chulls → "10% more loot!"
+  3. Power farmers: "How do I crush enemies?" → Build Training Camps + recruit Shardbearers
+
+This is GOOD game design - mechanics reward player experimentation.
+
+================================================================================
+SUMMARY: WHAT TO FIX VS WHAT TO KEEP
+================================================================================
+
+DEFINITELY IMPLEMENT (Easy, high value):
+  1. Fix Archers with unique role (5 mins decision, prevents "why buy these")
+  2. Increase Noble survival from 50% to 65% (1 line of code)
+  3. Add tooltips explaining carry/speed/power (10 minutes UI work)
+
+PLAYTEST FIRST, THEN DECIDE:
+  4. Monastery cost/effect (playtest reveal if it feels weak)
+  5. Ledger Gemheart cost (see if players ever feel reachable progression)
+  6. Arena fabrial costs (arena economy may justify current pricing)
+
+DO NOT CHANGE (Working as intended):
+  • Bridgecrews (5 S, +0.01 speed) ✓
+  • Chulls (50 S, 10 carry) ✓
+  • Spearmen (10 S, 1 power) ✓
+  • Shardbearers (1 GH, 2.0x mult) ✓
+  • Gravity Lift (5 GH, 2.0x speed) ✓
+  • Research Library / Spy Network gating ✓
+
+
+================================================================================
+SECTION 6: TESTING PROTOCOL RECOMMENDATIONS
+================================================================================
+
+The game systems are fundamentally sound. Testing should validate that:
+
+CRITICAL TESTING GOALS:
+────────────────────────
+
+1. Bridgecrews speed farming feels good
+   • Do players naturally discover that +0.01 speed × 100 units = missions 2x faster?
+   • Does farming feel rewarding (completing missions frequently)?
+   • Metric: Can player complete 8 attacks in 2 hours (dev time) with Bridgecrews?
+
+2. Chulls profit farming feels valuable
+   • Do players see the carry bonus (+10% rewards) as worth the investment?
+   • Metric: Player chooses: 100 Spearmen vs 50 Spearmen + 10 Chulls?
+     (If they pick Spearmen, Chulls aren't valuable enough)
+
+3. Archers have a reason to exist
+   • AFTER the unique mechanic fix, do players ever recruit Archers?
+   • If still not purchased, role is still unclear
+
+4. Fabrials feel like meaningful purchases
+   • Can player tell the difference after buying Gravity Lift? (Speed is obvious)
+   • Can player tell the difference after buying Ledger? (Passive income harder to notice)
+   • Metric: "Wow, missions feel so much faster/wealthier" vs "Did anything happen?"
+
+5. Nobles are more viable for espionage early-game
+   • After increasing survival, do players feel OK recruiting Nobles?
+   • Before: "These die instantly" → After: "This is reasonable"
+
+SCENARIO TESTING (Play through different paths):
+──────────────────────────────────────────────────
+
+SCENARIO A - Early Game (0-1 hour played):
+  • Can build 2-3 Markets without frustration?
+  • Does basic mission farming feel rewarding?
+  • Can afford Gravity Lift within first 30 mins? (Yes = healthy Gemheart rate)
+  
+SCENARIO B - Mid Game (3-5 hours):
+  • Are there meaningful unit composition choices?
+  • Does choosing "speed farm" vs "profit farm" feel like valid strategy?
+  • Is Ledger considered valuable yet? (Probably not - too many Markets needed)
+
+SCENARIO C - Arena Focus (parallel track):
+  • Arena fabrials enable meaningful progression?
+  • Does Half-Shard feel worth 4 GH? (Compare vs Gravity Lift)
+
+SCENARIO D - Espionage Focus:
+  • Spy Network (5,000 S) feels like reasonable gate?
+  • Ghostblood recruitment affordable during mid-game?
+  • Whisper Tower feels attainable/useful at endgame?
+
+================================================================================
+SECTION 7: REVISED CONCLUSION
+================================================================================
+
+GAME BALANCE ASSESSMENT: HEALTHY
+
+The analysis reveals the game has STRONG emergent design:
+
+✓ UNITS CREATE DISTINCT PLAYSTYLES:
+  • Bridgecrews + Gravity Lift = Speed farming (4-6x mission frequency)
+  • Chulls + Ledger = Profit farming (20% reward boost)
+  • Shardbearers + Training Camp = Power scaling (multipliers for big armies)
+
+✓ MISSIONS REWARD COMPOSITION DECISIONS:
+  • Carry bonus (1% per point) makes Chulls viable economic choice
+  • Speed bonus (mission frequency) makes Bridgecrews viable early investment
+  • Power requirement makes basic units valuable (don't need all Shardbearers)
+
+✓ PROGRESSION GATING RESPECTS PLAYER PATHS:
+  • Spy Network/Research Library unlock without forcing
+  • Shardbearers are Gemheart sink for late-game power
+  • Fabrials enable (but don't require) specific strategies
+
+✓ RESOURCE FLOWS ARE BALANCED:
+  • Spheres: Easy to earn, spent on units/buildings
+  • Gemhearts: Scarce, spent on Shardbearers/Fabrials (creates meaningful choices)
+  • Provisions: Army capacity gate (meaningful constraint)
+  • Territory: Endgame expansion resource (not binding mid-game)
+
+WHAT NEEDS QUICK FIXES:
+  1. Archers: Give unique role so they're not just "expensive Spearmen"
+  2. Nobles: Increase survival from 50% to 65% (currently too fragile)
+  3. UI: Add tooltips explaining carry/speed/power mechanics
+  4. (Optional) Monastery: Could reduce cost or add effect if playtesting shows it's weak
+
+DO NOT CHANGE:
+  Bridgecrews, Chulls, Spearmen, Shardbearers, Markets, Gravity Lift, gating systems
+  These are working as intended and create interesting strategic depth.
+
+PLAYTESTING FOCUS:
+  • Does speed farming feel rewarding? ← Most important
+  • Do players naturally discover strategic unit combinations?
+  • Do Archers (after fix) have a place?
+  • Does Ledger feel reachable/valuable?
+
+RECOMMENDATION: The game is ready for polish phase. Fix the 3 quick wins (Archers,
+Nobles, Tooltips) and the systems are balanced. Focus remaining effort on UI
+polish and player communication rather than mechanical balance adjustments.
+
+================================================================================
+END OF PURCHASABLE_STATS_SHEET.txt
+==============================================================================
