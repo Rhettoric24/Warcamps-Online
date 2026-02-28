@@ -140,14 +140,17 @@ export async function syncWithServer() {
 }
 
 /**
- * Get time until next day tick
- * @returns {number} Milliseconds until next day
+ * Get time until next day tick (in REAL TIME milliseconds)
+ * @returns {number} Real-time milliseconds until next day
  */
 export function getTimeUntilNextDay() {
     const currentGameMs = getCurrentGameTime();
-    const GAME_DAY_MS = 24 * 60 * 60 * 1000;
+    const GAME_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in game time
     const msIntoCurrentDay = currentGameMs % GAME_DAY_MS;
-    return GAME_DAY_MS - msIntoCurrentDay;
+    const gameTimeRemaining = GAME_DAY_MS - msIntoCurrentDay;
+    
+    // Convert game time to real time (divide by 24 since game runs 24x faster)
+    return gameTimeRemaining / 24;
 }
 
 /**

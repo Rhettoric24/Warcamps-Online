@@ -106,14 +106,18 @@ export function stopTitleFlash() {
 }
 
 export function formatTime(ms) {
-    const secs = Math.ceil(ms / 1000);
-    let timeStr = `${secs}s`;
-    if (secs > 60) {
-        const mins = Math.floor(secs / 60);
-        const s = secs % 60;
-        timeStr = `${mins}m ${s}s`;
+    const totalSecs = Math.ceil(ms / 1000);
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    
+    if (hours > 0) {
+        return `${hours}h ${mins}m`;
+    } else if (mins > 0) {
+        return `${mins}m ${secs}s`;
+    } else {
+        return `${secs}s`;
     }
-    return timeStr;
 }
 
 export function flashScreen(type = 'warn') {
