@@ -21,7 +21,9 @@ app.use(cors({
     'https://Rhettoric24.github.io',        // GitHub Pages deployment
     'http://localhost:3000',                 // Local dev (if needed)
     'http://localhost:3001',                 // Local dev server
-    'http://127.0.0.1:3001'                  // Localhost alias
+    'http://localhost:5500',                 // VS Code Live Server
+    'http://127.0.0.1:3001',                 // Localhost alias
+    'http://127.0.0.1:5500'                  // Live Server on 127.0.0.1
   ],
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
