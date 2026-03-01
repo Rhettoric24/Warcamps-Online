@@ -16,7 +16,18 @@ if (!process.env.JWT_SECRET) {
 const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, searchPlayers, getRankings } = require('./database');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://Rhettoric24.github.io',        // GitHub Pages deployment
+    'http://localhost:3000',                 // Local dev (if needed)
+    'http://localhost:3001',                 // Local dev server
+    'http://127.0.0.1:3001'                  // Localhost alias
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 3600
+}));
 app.use(express.json());
 
 function generateAuthToken(player) {
