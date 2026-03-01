@@ -2,7 +2,7 @@
 // Handles login, registration, and session management
 
 // Use localhost for development, Railway for production
-const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+export const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3001'
     : 'https://warcamps-online-production.up.railway.app';
 

@@ -3,6 +3,7 @@ import { CONSTANTS, BUILDING_DATA, FABRIAL_DATA, NPC_PRINCES } from '../core/con
 import { getArmyStats, getAvailableTroops, getSpyPower } from '../military/military.js';
 import { getBuildingCost } from '../buildings/buildings.js';
 import { formatTime } from '../core/utils.js';
+import { SERVER_URL } from '../core/auth.js';
 import { getCurrentGameTime, formatGameTime, getTimeUntilNextDay } from '../core/server-api.js';
 import { updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket } from './modal-manager.js';
 import { generateThrillButtons } from '../arena/arena.js';
@@ -1018,7 +1019,7 @@ export async function showRankings(metric = 'spheres') {
     document.getElementById('ranking-header-value').textContent = headerMap[metric] || 'Amount';
     
     try {
-        const response = await fetch(`http://localhost:3001/api/rankings?metric=${metric}&limit=20`);
+        const response = await fetch(`${SERVER_URL}/api/rankings?metric=${metric}&limit=20`);
         const result = await response.json();
         
         if (!result.success || !result.leaderboard) {
@@ -1086,7 +1087,7 @@ export async function searchPlayers() {
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
         const response = await fetch(
-            `http://localhost:3001/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
+            `${SERVER_URL}/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
             { headers }
         );
         const result = await response.json();
@@ -1177,7 +1178,7 @@ export async function searchEspionageTargets() {
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
         const response = await fetch(
-            `http://localhost:3001/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
+            `${SERVER_URL}/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
             { headers }
         );
         const result = await response.json();
@@ -1240,7 +1241,7 @@ export async function viewPlayerProfile(username) {
     document.getElementById('profile-username').textContent = username;
     
     try {
-        const response = await fetch(`http://localhost:3001/api/player/${encodeURIComponent(username)}`);
+        const response = await fetch(`${SERVER_URL}/api/player/${encodeURIComponent(username)}`);
         const result = await response.json();
         
         if (!result.success || !result.player) {
