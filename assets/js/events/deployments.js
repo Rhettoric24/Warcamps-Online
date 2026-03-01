@@ -140,7 +140,7 @@ export function updateMissionInfo(gameState) {
     // Calculate estimated duration
     const type = gameState.state.pendingDeployType;
     const baseDays = type === 'scout' ? 1 : (type === 'attack' ? 1.5 : (type === 'conquest' ? 1 : 2));
-    const durationMs = type === 'run' || type === 'conquest'
+    const durationMs = type === 'run'
         ? (baseDays * CONSTANTS.DAY_MS)
         : (baseDays * CONSTANTS.DAY_MS) / speed;
     const durationHours = (durationMs / 3600000).toFixed(1);
