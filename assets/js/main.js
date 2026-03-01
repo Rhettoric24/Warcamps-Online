@@ -1,7 +1,8 @@
 // Main entry point for Warcamp Simulator
 import { CONSTANTS, NPC_PRINCES, DEV_MODE, BUILDING_DATA } from './core/constants.js';
-import { createGameState, loadGameState, saveGameState } from './core/game-state.js';
+import { createGameState, loadGameState, saveGameState, applyStateSnapshot } from './core/game-state.js';
 import { initializeServerConnection, getCurrentGameTime, syncWithServer, gameMsToDays, formatGameTime, getTimeUntilNextDay } from './core/server-api.js';
+import { registerPlayer, loginPlayer, logoutPlayer, getCurrentPlayer, restoreSession, loadPlayerState, savePlayerState } from './core/auth.js';
 
 // Log DEV_MODE status immediately on load
 console.log('%c🎮 WARCAMP SIMULATOR LOADED', 'background: #1e3a8a; color: #00f2ff; font-weight: bold; padding: 8px; font-size: 14px;');
@@ -13,7 +14,7 @@ if (DEV_MODE) {
     console.log('Dev mode is OFF. Change DEV_MODE to true in assets/js/core/constants.js');
 }
 import { log, requestNotificationPermission, updateNotificationButton, triggerNotification, flashScreen } from './core/utils.js';
-import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal } from './ui/ui-manager.js';
+import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage } from './ui/ui-manager.js';
 import { openModal, closeModal, updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket, closeRecapModal, closeMissionModal, openSpanreedModal, closeSpanreedModal, setSpanreedTab, openSpyPlanningModal, closeSpyPlanningModal, openOfflineRecapModal, closeOfflineRecapModal } from './ui/modal-manager.js';
 import { recruit, getArmyStats } from './military/military.js';
 import { build, buyGemheart, constructFabrial, upgradeBuilding, getEffectiveBuildingBonus } from './buildings/buildings.js';
@@ -28,14 +29,115 @@ import { getConquestStatus, canStartConquest } from './events/conquest.js';
 const gameInstance = {
     ...createGameState(),
 
-    // Core methods
-    async login() {
-        const input = document.getElementById('username-input');
-        const name = input.value.trim();
-        if (!name) return;
+    // Authentication methods
+    showLoginTab() {
+        document.getElementById('login-form').classList.remove('hidden');
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('tab-login').classList.remove('auth-tab-inactive');
+        document.getElementById('tab-login').classList.add('auth-tab-active');
+        document.getElementById('tab-register').classList.remove('auth-tab-active');
+        document.getElementById('tab-register').classList.add('auth-tab-inactive');
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('register-error').classList.add('hidden');
+    },
 
-        this.username = name;
-        document.getElementById('player-name-display').innerText = name;
+    showRegisterTab() {
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('register-form').classList.remove('hidden');
+        document.getElementById('tab-register').classList.remove('auth-tab-inactive');
+        document.getElementById('tab-register').classList.add('auth-tab-active');
+        document.getElementById('tab-login').classList.remove('auth-tab-active');
+        document.getElementById('tab-login').classList.add('auth-tab-inactive');
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('register-error').classList.add('hidden');
+    },
+
+    async handleLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errorDiv = document.getElementById('login-error');
+        const loadingDiv = document.getElementById('auth-loading');
+
+        if (!username || !password) {
+            errorDiv.textContent = 'Please enter username and password';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        errorDiv.classList.add('hidden');
+        loadingDiv.classList.remove('hidden');
+
+        const result = await loginPlayer(username, password);
+
+        loadingDiv.classList.add('hidden');
+
+        if (result.success) {
+            this.username = result.player.username;
+            this.playerId = result.player.id;
+            await this.startGame(result.player);
+        } else {
+            errorDiv.textContent = result.error || 'Login failed';
+            errorDiv.classList.remove('hidden');
+        }
+    },
+
+    async handleRegister() {
+        const username = document.getElementById('register-username').value.trim();
+        const password = document.getElementById('register-password').value;
+        const confirmPassword = document.getElementById('register-password-confirm').value;
+        const errorDiv = document.getElementById('register-error');
+        const loadingDiv = document.getElementById('auth-loading');
+
+        // Validation
+        if (!username || !password || !confirmPassword) {
+            errorDiv.textContent = 'Please fill in all fields';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (username.length < 3 || username.length > 20) {
+            errorDiv.textContent = 'Username must be 3-20 characters';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            errorDiv.textContent = 'Username can only contain letters, numbers, and underscores';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (password.length < 6) {
+            errorDiv.textContent = 'Password must be at least 6 characters';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            errorDiv.textContent = 'Passwords do not match';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        errorDiv.classList.add('hidden');
+        loadingDiv.classList.remove('hidden');
+
+        const result = await registerPlayer(username, password);
+
+        loadingDiv.classList.add('hidden');
+
+        if (result.success) {
+            this.username = result.player.username;
+            this.playerId = result.player.id;
+            await this.startGame(result.player);
+        } else {
+            errorDiv.textContent = result.error || 'Registration failed';
+            errorDiv.classList.remove('hidden');
+        }
+    },
+
+    async startGame(player) {
+        document.getElementById('player-name-display').innerText = player.username;
         
         // Connect to server before starting game
         log('Connecting to server...', 'text-cyan-400');
@@ -48,15 +150,29 @@ const gameInstance = {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('game-container').classList.remove('hidden');
 
-        loadGameState(name, this);
+        const freshState = createGameState();
+        this.state = freshState.state;
+
+        // Load player's saved game state from server (fallback to localStorage)
+        const serverLoad = await loadPlayerState(player.id, player.username);
+        if (serverLoad.success && serverLoad.gameState) {
+            applyStateSnapshot(this, serverLoad.gameState);
+            log('☁️ Loaded warcamp state from server.', 'text-cyan-400');
+        } else {
+            loadGameState(player.username, this);
+            log('💾 Loaded local backup state (server save unavailable).', 'text-slate-400');
+        }
+        
         this.processOfflineTime();
         updateUI(this);
-        setInterval(() => this.loop(), CONSTANTS.UI_UPDATE_RATE);
+        this.clearIntervals();
+        this.loopIntervalId = setInterval(() => this.loop(), CONSTANTS.UI_UPDATE_RATE);
         
         // Sync with server every 30 seconds to stay accurate
-        setInterval(() => syncWithServer(), 30000);
+        this.serverSyncIntervalId = setInterval(() => syncWithServer(), 30000);
+        this.persistenceIntervalId = setInterval(() => this.persistState('interval'), 60000);
         
-        log(`Welcome, Highprince ${name}. Warcamp Command online.`, "text-cyan-400 font-bold");
+        log(`Welcome, Highprince ${player.username}. Warcamp Command online.`, "text-cyan-400 font-bold");
         if (DEV_MODE) {
             log(`⚡ DEV MODE ACTIVE: 10-second days, 10k spheres, 2 gemhearts`, "text-yellow-400 font-bold");
             console.log('%c⚡ DEV MODE ENABLED', 'background: #fbbf24; color: black; font-weight: bold; padding: 4px 8px;');
@@ -67,10 +183,136 @@ const gameInstance = {
         updateNotificationButton();
     },
 
-    init() {
-        document.getElementById('username-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.login();
-        });
+    clearIntervals() {
+        if (this.loopIntervalId) {
+            clearInterval(this.loopIntervalId);
+            this.loopIntervalId = null;
+        }
+
+        if (this.serverSyncIntervalId) {
+            clearInterval(this.serverSyncIntervalId);
+            this.serverSyncIntervalId = null;
+        }
+
+        if (this.persistenceIntervalId) {
+            clearInterval(this.persistenceIntervalId);
+            this.persistenceIntervalId = null;
+        }
+    },
+
+    async persistState(reason = 'manual') {
+        if (!this.playerId || !this.username) return;
+        if (this.isPersisting) return;
+
+        this.isPersisting = true;
+        const snapshot = JSON.parse(JSON.stringify(this.state));
+
+        try {
+            const result = await savePlayerState(this.playerId, this.username, snapshot);
+            if (result.success) {
+                this.lastPersistAt = Date.now();
+            }
+        } catch (error) {
+            console.error('Persist failed:', error);
+        } finally {
+            this.isPersisting = false;
+        }
+    },
+
+    async logout() {
+        if (this.username) {
+            saveGameState(this.username, this);
+        }
+
+        await this.persistState('logout');
+
+        this.clearIntervals();
+        logoutPlayer();
+
+        this.username = null;
+        this.playerId = null;
+        const freshState = createGameState();
+        this.state = freshState.state;
+
+        document.getElementById('game-container').classList.add('hidden');
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('player-name-display').innerText = '';
+
+        const loginUser = document.getElementById('login-username');
+        const loginPass = document.getElementById('login-password');
+        const registerUser = document.getElementById('register-username');
+        const registerPass = document.getElementById('register-password');
+        const registerConfirm = document.getElementById('register-password-confirm');
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+
+        if (loginUser) loginUser.value = '';
+        if (loginPass) loginPass.value = '';
+        if (registerUser) registerUser.value = '';
+        if (registerPass) registerPass.value = '';
+        if (registerConfirm) registerConfirm.value = '';
+        if (loginError) loginError.classList.add('hidden');
+        if (registerError) registerError.classList.add('hidden');
+
+        this.showLoginTab();
+        if (loginUser) loginUser.focus();
+
+        log('Logged out. You can now sign in with a different Highprince account.', 'text-slate-400');
+    },
+
+    // Core methods
+    async login() {
+        // Legacy method - now handled by handleLogin/handleRegister
+        // Kept for backward compatibility
+        await this.handleLogin();
+    },
+
+    async init() {
+        // Try to restore existing session
+        const session = await restoreSession();
+        if (session) {
+            this.username = session.username;
+            this.playerId = session.id;
+            await this.startGame(session);
+            return;
+        }
+
+        // Add Enter key support for login forms
+        const loginUsername = document.getElementById('login-username');
+        const loginPassword = document.getElementById('login-password');
+        const registerUsername = document.getElementById('register-username');
+        const registerPassword = document.getElementById('register-password');
+        const registerConfirm = document.getElementById('register-password-confirm');
+
+        if (loginUsername) {
+            loginUsername.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loginPassword.focus();
+            });
+        }
+
+        if (loginPassword) {
+            loginPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.handleLogin();
+            });
+        }
+
+        if (registerUsername) {
+            registerUsername.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') registerPassword.focus();
+            });
+        }
+
+        if (registerPassword) {
+            registerPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') registerConfirm.focus();
+            });
+        }
+
+        if (registerConfirm) {
+            registerConfirm.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.handleRegister();
+            });
+        }
         
         // Update espionage display when target selection changes
         const targetSelects = [document.getElementById('spy-target-modal'), document.getElementById('spy-target')];
@@ -154,6 +396,10 @@ const gameInstance = {
         this.state.lastActiveTime = now;
         this.state.lastGameTime = now; // Track server game time
         saveGameState(this.username, this);
+
+        if (!this.lastPersistAt || (Date.now() - this.lastPersistAt) >= 60000) {
+            this.persistState('loop');
+        }
     },
 
     checkPlateau() {
@@ -680,7 +926,18 @@ const gameInstance = {
     _updateModalStats: (stats) => updateModalStats(stats),
     _updateSpyNetwork: (unlocked) => updateSpyNetwork(unlocked),
     _toggleTournamentCard: (active) => toggleTournamentCard(active),
-    _toggleBlackMarket: (unlocked) => toggleBlackMarket(unlocked)
+    _toggleBlackMarket: (unlocked) => toggleBlackMarket(unlocked),
+    /* Rankings and Player Search */
+    showRankings: (metric) => showRankings(metric),
+    searchPlayers: () => searchPlayers(),
+    refreshRankings: () => refreshRankings(),
+    viewPlayerProfile: (username) => viewPlayerProfile(username),
+    targetPlayerForEspionage: (username) => targetPlayerForEspionage(username),
+    /* Espionage Target Selection */
+    setEspionageTargetType: (type) => setEspionageTargetType(type),
+    searchEspionageTargets: () => searchEspionageTargets(),
+    selectEspionageTarget: (username) => selectEspionageTarget(username),
+    clearEspionageTarget: () => clearEspionageTarget()
 };
 
 // Helper functions for highstorm modal

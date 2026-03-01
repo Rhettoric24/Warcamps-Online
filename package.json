@@ -1,0 +1,10 @@
+{
+  "name": "warcamps-online-workspace",
+  "private": true,
+  "scripts": {
+    "server:start": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
+    "db:inspect": "npm --prefix server run db:inspect",
+    "db:reset": "npm --prefix server run db:reset"
+  }
+}

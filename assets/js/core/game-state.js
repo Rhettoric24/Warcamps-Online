@@ -89,6 +89,11 @@ export function loadGameState(username, gameState) {
     if (!saved) return false;
 
     const parsed = JSON.parse(saved);
+    return applyStateSnapshot(gameState, parsed);
+}
+
+export function applyStateSnapshot(gameState, parsed) {
+    if (!parsed || typeof parsed !== 'object') return false;
 
     // Handle migration of fabrials from boolean to numbers
     let newFabrials = { ...gameState.state.fabrials };

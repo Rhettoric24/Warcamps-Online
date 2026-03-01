@@ -127,12 +127,63 @@
         </div>
     </div>
 
-    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-4">
-        <div class="max-w-md w-full bg-slate-800 p-8 rounded-lg border-2 border-blue-900 shadow-2xl text-center">
-            <h1 class="text-3xl font-cinzel text-blue-400 mb-2">Command Hub, Palace</h1>
-            <p class="text-slate-400 mb-6 italic">Enter your name, Highprince, to access your warcamp.</p>
-            <input type="text" id="username-input" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white text-center mb-4 focus:border-blue-500 outline-none" placeholder="Highprince Name">
-            <button onclick="window.game && window.game.login()" class="w-full btn-alethi py-3 rounded font-bold text-lg">ENTER COMMAND</button>
+    <div id="login-screen" class="fixed inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-blue-950 z-50 flex flex-col items-center justify-center p-4">
+        <div class="max-w-md w-full bg-slate-800 p-8 rounded-lg border-2 border-blue-900 shadow-2xl">
+            <h1 class="text-3xl font-cinzel text-blue-400 mb-2 text-center">Warcamp Command</h1>
+            <p class="text-slate-400 mb-6 italic text-center text-sm">Authenticate to access your forces</p>
+            
+            <!-- Tab Toggle -->
+            <div class="flex gap-2 mb-6 bg-slate-900 rounded-lg p-1">
+                <button id="tab-login" onclick="window.game && window.game.showLoginTab()" class="flex-1 py-2 rounded font-bold transition-all auth-tab-active">
+                    LOGIN
+                </button>
+                <button id="tab-register" onclick="window.game && window.game.showRegisterTab()" class="flex-1 py-2 rounded font-bold transition-all auth-tab-inactive">
+                    REGISTER
+                </button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2 font-bold">USERNAME</label>
+                    <input type="text" id="login-username" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 outline-none" placeholder="Enter username">
+                </div>
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2 font-bold">PASSWORD</label>
+                    <input type="password" id="login-password" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 outline-none" placeholder="Enter password">
+                </div>
+                <div id="login-error" class="text-red-400 text-sm text-center hidden"></div>
+                <button onclick="window.game && window.game.handleLogin()" class="w-full btn-alethi py-3 rounded font-bold text-lg">
+                    LOGIN
+                </button>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2 font-bold">USERNAME</label>
+                    <input type="text" id="register-username" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 outline-none" placeholder="Choose username">
+                    <p class="text-slate-500 text-xs mt-1">3-20 characters, alphanumeric only</p>
+                </div>
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2 font-bold">PASSWORD</label>
+                    <input type="password" id="register-password" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 outline-none" placeholder="Create password">
+                    <p class="text-slate-500 text-xs mt-1">Minimum 6 characters</p>
+                </div>
+                <div>
+                    <label class="block text-slate-300 text-sm mb-2 font-bold">CONFIRM PASSWORD</label>
+                    <input type="password" id="register-password-confirm" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-blue-500 outline-none" placeholder="Confirm password">
+                </div>
+                <div id="register-error" class="text-red-400 text-sm text-center hidden"></div>
+                <button onclick="window.game && window.game.handleRegister()" class="w-full btn-alethi py-3 rounded font-bold text-lg">
+                    CREATE ACCOUNT
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="auth-loading" class="text-center text-slate-400 mt-4 hidden">
+                <span class="animate-pulse">🔄 Authenticating...</span>
+            </div>
         </div>
     </div>
 
@@ -152,6 +203,9 @@
                         </div>
                         <button id="btn-notifications" onclick="game.requestNotificationPermission()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-2 py-1 rounded transition-colors font-bold" title="Enable Desktop Alerts">
                             🔔 Alerts
+                        </button>
+                        <button id="btn-logout" onclick="game.logout()" class="text-xs bg-slate-800 hover:bg-red-900 text-slate-300 border border-slate-600 hover:border-red-700 px-2 py-1 rounded transition-colors font-bold" title="Log out and switch account">
+                            🚪 Logout
                         </button>
                     </div>
                 </div>
@@ -196,6 +250,7 @@
                         <button onclick="game.openModal('spy')" id="tab-spy" class="tab-btn flex-1 min-w-max py-3 px-2 text-sm font-bold uppercase tracking-wider hidden text-green-400">Espionage</button>
                         <button onclick="game.openModal('fabrial')" id="tab-fabrial" class="tab-btn flex-1 min-w-max py-3 px-2 text-sm font-bold uppercase tracking-wider hidden text-purple-400">Fabrials</button>
                         <button onclick="game.setTab('arena')" id="tab-arena" class="tab-btn flex-1 min-w-max py-3 px-2 text-sm font-bold uppercase tracking-wider hidden text-red-400">Arena</button>
+                        <button onclick="game.setTab('rankings')" id="tab-rankings" class="tab-btn flex-1 min-w-max py-3 px-2 text-sm font-bold uppercase tracking-wider text-yellow-400">Rankings</button>
                     </div>
 
                     <!-- LOGISTICS TAB -->
@@ -530,6 +585,74 @@
                         </div>
 
                     </div>
+
+                    <!-- RANKINGS TAB -->
+                    <div id="panel-rankings" class="hidden p-6 space-y-4">
+                        <div class="flex justify-between items-center border-b border-yellow-900 pb-2">
+                            <h2 class="text-sm font-cinzel text-yellow-400">LEADERBOARDS</h2>
+                            <button onclick="game.refreshRankings()" class="text-yellow-400 hover:text-yellow-300 text-xs">
+                                🔄 Refresh
+                            </button>
+                        </div>
+
+                        <!-- Metric Selector -->
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="game.showRankings('spheres')" class="ranking-metric-btn active" data-metric="spheres">
+                                💰 Wealth
+                            </button>
+                            <button onclick="game.showRankings('military')" class="ranking-metric-btn" data-metric="military">
+                                ⚔️ Military
+                            </button>
+                            <button onclick="game.showRankings('land')" class="ranking-metric-btn" data-metric="land">
+                                🏘️ Land
+                            </button>
+                            <button onclick="game.showRankings('days')" class="ranking-metric-btn" data-metric="days">
+                                📅 Longevity
+                            </button>
+                        </div>
+
+                        <!-- Rankings Table -->
+                        <div class="bg-slate-900/50 border border-slate-700 rounded overflow-hidden">
+                            <div class="max-h-96 overflow-y-auto">
+                                <table class="w-full text-xs">
+                                    <thead class="bg-slate-800 sticky top-0">
+                                        <tr>
+                                            <th class="text-left p-2 text-slate-400">#</th>
+                                            <th class="text-left p-2 text-slate-400">Player</th>
+                                            <th class="text-right p-2 text-slate-400" id="ranking-header-value">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rankings-table-body">
+                                        <tr>
+                                            <td colspan="3" class="text-center p-4 text-slate-500">
+                                                Loading rankings...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Player Search -->
+                        <div class="border-t border-slate-700 pt-4 mt-4">
+                            <h3 class="text-xs font-bold text-slate-400 mb-2">SEARCH PLAYERS</h3>
+                            <div class="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    id="player-search-input" 
+                                    placeholder="Search by username..." 
+                                    class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white"
+                                    onkeyup="if(event.key === 'Enter') game.searchPlayers()"
+                                >
+                                <button onclick="game.searchPlayers()" class="bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded">
+                                    Search
+                                </button>
+                            </div>
+                            <div id="player-search-results" class="mt-3 space-y-2 max-h-48 overflow-y-auto">
+                                <!-- Search results populated here -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- MILITARY DETAILS PANEL -->
@@ -775,12 +898,51 @@
                 <!-- Missions Section -->
                 <div>
                     <p class="text-xs font-bold text-green-400 uppercase mb-2 border-b border-green-700 pb-1">Intelligence Missions</p>
-                    <label class="block text-[10px] text-slate-400 mb-2">Target:</label>
-                    <select id="spy-target-modal" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-xs mb-3">
-                        <option value="sadeas">Highprince Sadeas</option>
-                        <option value="vargo">Highprince Taravangian</option>
-                        <option value="sebarial">Highprince Sebarial</option>
-                    </select>
+                    
+                    <!-- Target Type Selector -->
+                    <div class="flex gap-2 mb-3">
+                        <button onclick="game.setEspionageTargetType('npc')" id="spy-target-type-npc" class="flex-1 bg-slate-700 text-slate-300 py-2 rounded text-[10px] uppercase font-bold border-2 border-green-500">
+                            NPCs
+                        </button>
+                        <button onclick="game.setEspionageTargetType('player')" id="spy-target-type-player" class="flex-1 bg-slate-800 text-slate-500 py-2 rounded text-[10px] uppercase font-bold border-2 border-transparent">
+                            Players
+                        </button>
+                    </div>
+                    
+                    <!-- NPC Target Selection -->
+                    <div id="spy-npc-targets">
+                        <label class="block text-[10px] text-slate-400 mb-2">Target:</label>
+                        <select id="spy-target-modal" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-xs mb-3">
+                            <option value="sadeas">Highprince Sadeas</option>
+                            <option value="vargo">Highprince Taravangian</option>
+                            <option value="sebarial">Highprince Sebarial</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Player Target Selection -->
+                    <div id="spy-player-targets" class="hidden">
+                        <label class="block text-[10px] text-slate-400 mb-2">Search Player:</label>
+                        <div class="flex gap-2 mb-2">
+                            <input 
+                                type="text" 
+                                id="spy-player-search-input" 
+                                placeholder="Enter username..." 
+                                class="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs"
+                                onkeyup="if(event.key === 'Enter') game.searchEspionageTargets()"
+                            >
+                            <button onclick="game.searchEspionageTargets()" class="bg-green-700 hover:bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded">
+                                Search
+                            </button>
+                        </div>
+                        <div id="spy-player-search-results" class="max-h-32 overflow-y-auto mb-3 space-y-1">
+                            <p class="text-slate-500 text-[10px] text-center py-2">Search for a player to target</p>
+                        </div>
+                        <input type="hidden" id="spy-selected-player" value="">
+                        <div id="spy-selected-player-display" class="hidden bg-green-900/30 border border-green-600 p-2 rounded text-xs mb-3">
+                            <span class="text-green-300">Selected: <span id="spy-selected-player-name"></span></span>
+                            <button onclick="game.clearEspionageTarget()" class="float-right text-red-400 hover:text-red-300 text-[10px]">✕ Clear</button>
+                        </div>
+                    </div>
                     
                     <!-- Suspicion & Counter Intel Display -->
                     <div id="espionage-suspicion-display" class="bg-slate-900/50 border border-slate-700 p-2 rounded text-[10px] text-slate-300 mb-3">
@@ -1486,6 +1648,97 @@
                         <button onclick="game.sendSpanreedMessage()" class="btn-alethi px-4 py-2 rounded text-sm font-bold">SEND</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER PROFILE MODAL -->
+    <div id="player-profile-modal" class="modal">
+        <div class="bg-gradient-to-b from-slate-900 to-blue-950/20 border-2 border-blue-500/50 rounded-lg p-6 w-full max-w-2xl m-4 shadow-2xl shadow-blue-900/50">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-blue-300 uppercase tracking-wider">
+                    <span id="profile-username">Player Profile</span>
+                </h2>
+                <button onclick="game.closeModal('player-profile')" class="text-white hover:text-red-400 text-2xl font-bold">✕</button>
+            </div>
+            
+            <div id="profile-loading" class="text-center py-8">
+                <p class="text-slate-400">Loading player data...</p>
+            </div>
+            
+            <div id="profile-content" class="hidden space-y-4">
+                <!-- Basic Info -->
+                <div class="bg-slate-900/50 border border-slate-700 rounded p-4">
+                    <h3 class="text-sm font-bold text-slate-400 mb-2 uppercase">Basic Information</h3>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <span class="text-slate-500">Joined:</span> 
+                            <span id="profile-created" class="text-white font-mono">---</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500">Days Survived:</span> 
+                            <span id="profile-days" class="text-cyan-400 font-bold">---</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Military -->
+                <div class="bg-slate-900/50 border border-red-700/50 rounded p-4">
+                    <h3 class="text-sm font-bold text-red-400 mb-2 uppercase">⚔️ Military Forces</h3>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Spearmen:</span>
+                            <span id="profile-spearmen" class="text-white font-mono">---</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Archers:</span>
+                            <span id="profile-archers" class="text-white font-mono">---</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Chulls:</span>
+                            <span id="profile-chulls" class="text-white font-mono">---</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Shardbearers:</span>
+                            <span id="profile-shardbearers" class="text-purple-400 font-mono">---</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-700">
+                        <div class="flex justify-between text-sm font-bold">
+                            <span class="text-slate-300">Total Military:</span>
+                            <span id="profile-total-military" class="text-red-400">---</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Infrastructure -->
+                <div class="bg-slate-900/50 border border-cyan-700/50 rounded p-4">
+                    <h3 class="text-sm font-bold text-cyan-400 mb-2 uppercase">🏘️ Infrastructure</h3>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Markets:</span>
+                            <span id="profile-markets" class="text-white font-mono">---</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Total Buildings:</span>
+                            <span id="profile-total-buildings" class="text-cyan-400 font-bold font-mono">---</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex gap-2 pt-2">
+                    <button 
+                        onclick="game.targetPlayerForEspionage(document.getElementById('profile-username').textContent)" 
+                        class="flex-1 bg-green-700 hover:bg-green-600 text-white text-xs font-bold py-2 px-4 rounded"
+                    >
+                        🕵️ Target for Espionage
+                    </button>
+                </div>
+            </div>
+            
+            <div id="profile-error" class="hidden text-center py-8">
+                <p class="text-red-400">Failed to load player data</p>
             </div>
         </div>
     </div>

@@ -11,6 +11,14 @@ const modals = {
     spanreed: document.getElementById('spanreed-modal')
 };
 
+// Dynamically add player-profile modal when it's available
+if (typeof document !== 'undefined') {
+    const playerProfileModal = document.getElementById('player-profile-modal');
+    if (playerProfileModal) {
+        modals['player-profile'] = playerProfileModal;
+    }
+}
+
 export function openModal(system) {
     closeAllModals();
     if (modals[system]) {
@@ -18,8 +26,12 @@ export function openModal(system) {
     }
 }
 
-export function closeModal() {
-    closeAllModals();
+export function closeModal(specificModal = null) {
+    if (specificModal && modals[specificModal]) {
+        modals[specificModal].classList.remove('open');
+    } else {
+        closeAllModals();
+    }
 }
 
 export function openSpyPlanningModal() {

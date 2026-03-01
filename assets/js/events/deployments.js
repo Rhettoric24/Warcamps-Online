@@ -330,7 +330,7 @@ export function confirmDeploy(gameState) {
         
         const landReward = calculateLandReward(power, enemyPower);
         
-        const durationMs = CONSTANTS.DAY_MS;
+        const durationMs = CONSTANTS.DAY_MS * 24; // Convert to game milliseconds (24x speed)
         const deployment = {
             id: getCurrentGameTime(),
             type: 'conquest',
@@ -352,7 +352,7 @@ export function confirmDeploy(gameState) {
     }
 
     const baseDays = gameState.state.pendingDeployType === 'scout' ? 1 : 1.5;
-    const durationMs = (baseDays * CONSTANTS.DAY_MS) / speed;
+    const durationMs = ((baseDays * CONSTANTS.DAY_MS) / speed) * 24; // Convert to game milliseconds (24x speed)
     const deployment = {
         id: getCurrentGameTime(),
         type: gameState.state.pendingDeployType,

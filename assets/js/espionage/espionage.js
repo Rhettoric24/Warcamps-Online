@@ -3,6 +3,7 @@ import { NPC_PRINCES, SUSPICION_LEVELS, SUSPICION_THRESHOLDS, CONSTANTS } from '
 import { getSpyPower } from '../military/military.js';
 import { log } from '../core/utils.js';
 import { openSpyPlanningModal } from '../ui/modal-manager.js';
+import { getCurrentGameTime } from '../core/server-api.js';
 import { addReport } from '../ui/ui-manager.js';
 import { isSpyBonusActive } from '../events/highstorm.js';
 
@@ -115,7 +116,7 @@ export function spyAction(gameState, action) {
 
     // Determine mission type and timing
     const isSabotage = action === 'sabotage_steal_spheres' || action === 'sabotage_steal_gems';
-    const missionDuration = isSabotage ? CONSTANTS.DAY_MS : CONSTANTS.DAY_MS / 2;
+    const missionDuration = (isSabotage ? CONSTANTS.DAY_MS : CONSTANTS.DAY_MS / 2) * 24; // Convert to game milliseconds (24x speed)
 
     const actionLabelMap = {
         military: 'Scan Military',
@@ -130,7 +131,7 @@ export function spyAction(gameState, action) {
     const actionLabel = actionLabelMap[action] || action;
     
     const spyMission = {
-        id: Date.now(),
+        id: getCurrentGameTime(),
         type: 'espionage',
         action: action,
         actionLabel: actionLabel,
@@ -138,7 +139,7 @@ export function spyAction(gameState, action) {
         targetName: target.name,
         myAgents: Math.floor(myAgents),
         units: { agents: Math.floor(myAgents) },
-        returnTime: Date.now() + missionDuration,
+        returnTime: getCurrentGameTime() + missionDuration,
         targetAgents: target.agents,
         counterIntelSpent: 0,
         isSabotage: isSabotage

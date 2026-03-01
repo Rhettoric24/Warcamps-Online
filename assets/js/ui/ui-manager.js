@@ -411,10 +411,11 @@ export function updateDeploymentsUI(gameState) {
         depList.innerHTML = '<p class="text-xs text-slate-500 italic text-center">No active missions.</p>';
     } else {
         gameState.state.deployments.forEach((d, index) => {
-            const timeLeft = Math.max(0, (d.returnTime - Date.now()) / 1000).toFixed(0);
-            const hrs = Math.floor(timeLeft / 3600);
-            const mins = Math.floor((timeLeft % 3600) / 60);
-            const secs = Math.floor(timeLeft % 60);
+            const timeLeftMs = Math.max(0, (d.returnTime - getCurrentGameTime()) / 24); // convert game ms to real ms
+            const timeLeftSeconds = Math.floor(timeLeftMs / 1000);
+            const hrs = Math.floor(timeLeftSeconds / 3600);
+            const mins = Math.floor((timeLeftSeconds % 3600) / 60);
+            const secs = Math.floor(timeLeftSeconds % 60);
 
             let timeStr = `${secs}s`;
             if (hrs > 0) timeStr = `${hrs}h ${mins}m`;
@@ -461,8 +462,8 @@ export function updateSpyPlanningUI(gameState) {
     }
 
     const active = activeMissions.sort((a, b) => a.returnTime - b.returnTime)[0];
-    const timeLeftMs = Math.max(0, active.returnTime - Date.now());
-    const timeStr = formatTime(timeLeftMs);
+    const timeLeftRealMs = Math.max(0, (active.returnTime - getCurrentGameTime()) / 24); // convert game ms to real ms
+    const timeStr = formatTime(timeLeftRealMs);
     const targetName = active.targetName || NPC_PRINCES[active.targetKey]?.name || active.targetKey || 'Unknown';
 
     if (emptyEl) emptyEl.classList.add('hidden');
@@ -594,7 +595,13 @@ export function setTab(tab) {
     document.getElementById('panel-spy').classList.add('hidden');
     document.getElementById('panel-fabrial').classList.add('hidden');
     document.getElementById('panel-arena').classList.add('hidden');
+    document.getElementById('panel-rankings').classList.add('hidden');
     document.getElementById('panel-' + tab).classList.remove('hidden');
+    
+    // Auto-load rankings when switching to rankings tab
+    if (tab === 'rankings') {
+        showRankings('spheres');
+    }
 }
 
 // Spanreed Center - Reports & Messages
@@ -822,17 +829,23 @@ export function openMissionDetails(gameState, missionIndex) {
     document.getElementById('mission-detail-type').textContent = typeLabel;
     
     // Update time information
-    const timeLeftMs = Math.max(0, mission.returnTime - Date.now());
-    const hrs = Math.floor(timeLeftMs / 3600000);
-    const mins = Math.floor((timeLeftMs % 3600000) / 60000);
-    const secs = Math.floor((timeLeftMs % 60000) / 1000);
+    const timeLeftRealMs = Math.max(0, (mission.returnTime - getCurrentGameTime()) / 24); // convert game ms to real ms
+    const hrs = Math.floor(timeLeftRealMs / 3600000);
+    const mins = Math.floor((timeLeftRealMs % 3600000) / 60000);
+    const secs = Math.floor((timeLeftRealMs % 60000) / 1000);
     
     let timeStr = `${secs}s`;
     if (hrs > 0) timeStr = `${hrs}h ${mins}m ${secs}s`;
     else if (mins > 0) timeStr = `${mins}m ${secs}s`;
     
     document.getElementById('mission-detail-time').textContent = timeStr;
-    document.getElementById('mission-detail-return').textContent = new Date(mission.returnTime).toLocaleString();
+    
+    // Convert game time back to real-world time for display
+    // Mission returns at: now + (remaining game ms / 24x multiplier)
+    const remainingGameMs = Math.max(0, mission.returnTime - getCurrentGameTime());
+    const remainingRealMs = remainingGameMs / 24; // 24x game speed
+    const realReturnTime = new Date(Date.now() + remainingRealMs);
+    document.getElementById('mission-detail-return').textContent = realReturnTime.toLocaleString();
     
     // Update units deployed
     const unitsContainer = document.getElementById('mission-detail-units');
@@ -979,4 +992,301 @@ export function updateMessagesList(gameState) {
                 <p class="text-slate-300 text-sm">${msg.text}</p>
             </div>
         `;
-    }).join('');}
+    }).join('');
+}
+
+// ============================================
+// RANKINGS & PLAYER SEARCH
+// ============================================
+
+export async function showRankings(metric = 'spheres') {
+    // Update active button
+    document.querySelectorAll('.ranking-metric-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.metric === metric) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Update table header
+    const headerMap = {
+        spheres: '💰 Spheres',
+        military: '⚔️ Military',
+        land: '🏘️ Land',
+        days: '📅 Days'
+    };
+    document.getElementById('ranking-header-value').textContent = headerMap[metric] || 'Amount';
+    
+    try {
+        const response = await fetch(`http://localhost:3001/api/rankings?metric=${metric}&limit=20`);
+        const result = await response.json();
+        
+        if (!result.success || !result.leaderboard) {
+            throw new Error('Failed to load rankings');
+        }
+        
+        const tbody = document.getElementById('rankings-table-body');
+        if (result.leaderboard.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-slate-500">No players found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = result.leaderboard.map((player, index) => {
+            let valueDisplay;
+            switch(metric) {
+                case 'spheres':
+                    valueDisplay = player.spheres.toLocaleString();
+                    break;
+                case 'military':
+                    valueDisplay = player.totalMilitary.toLocaleString();
+                    break;
+                case 'land':
+                    valueDisplay = player.totalLand.toLocaleString();
+                    break;
+                case 'days':
+                    valueDisplay = player.dayCount;
+                    break;
+                default:
+                    valueDisplay = Math.floor(player.rankValue).toLocaleString();
+            }
+            
+            const rank = index + 1;
+            const rankColor = rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-slate-300' : rank === 3 ? 'text-orange-400' : 'text-slate-500';
+            
+            return `
+                <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+                    <td class="p-2 ${rankColor} font-bold">${rank}</td>
+                    <td class="p-2 text-white">${player.username}</td>
+                    <td class="p-2 text-right text-cyan-400 font-mono">${valueDisplay}</td>
+                </tr>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error loading rankings:', error);
+        document.getElementById('rankings-table-body').innerHTML = 
+            '<tr><td colspan="3" class="text-center p-4 text-red-400">Failed to load rankings</td></tr>';
+    }
+}
+
+export async function searchPlayers() {
+    const input = document.getElementById('player-search-input');
+    const resultsDiv = document.getElementById('player-search-results');
+    const searchTerm = input.value.trim();
+    
+    if (!searchTerm) {
+        resultsDiv.innerHTML = '<p class="text-slate-500 text-xs">Enter a username to search</p>';
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<p class="text-slate-400 text-xs">Searching...</p>';
+    
+    try {
+        const token = localStorage.getItem('authToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch(
+            `http://localhost:3001/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
+            { headers }
+        );
+        const result = await response.json();
+        
+        if (!result.success || !result.players) {
+            throw new Error('Failed to search players');
+        }
+        
+        if (result.players.length === 0) {
+            resultsDiv.innerHTML = '<p class="text-slate-500 text-xs">No players found</p>';
+            return;
+        }
+        
+        resultsDiv.innerHTML = result.players.map(player => `
+            <div class="bg-slate-900/50 border border-slate-700 rounded p-2">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-white text-xs font-bold">${player.username}</p>
+                        <p class="text-slate-400 text-[10px]">
+                            ${player.spheres.toLocaleString()} S | 
+                            ${player.totalMilitary} troops | 
+                            Day ${player.dayCount}
+                        </p>
+                    </div>
+                    <button 
+                        onclick="game.viewPlayerProfile('${player.username}')" 
+                        class="bg-cyan-800 hover:bg-cyan-700 text-white text-[10px] font-bold px-2 py-1 rounded"
+                    >
+                        View
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error searching players:', error);
+        resultsDiv.innerHTML = '<p class="text-red-400 text-xs">Search failed</p>';
+    }
+}
+
+export async function refreshRankings() {
+    const activeBtn = document.querySelector('.ranking-metric-btn.active');
+    const metric = activeBtn ? activeBtn.dataset.metric : 'spheres';
+    await showRankings(metric);
+}
+
+// ============================================
+// ESPIONAGE TARGET SELECTION
+// ============================================
+
+export function setEspionageTargetType(type) {
+    const npcBtn = document.getElementById('spy-target-type-npc');
+    const playerBtn = document.getElementById('spy-target-type-player');
+    const npcTargets = document.getElementById('spy-npc-targets');
+    const playerTargets = document.getElementById('spy-player-targets');
+    
+    if (type === 'npc') {
+        npcBtn.classList.add('bg-slate-700', 'text-slate-300', 'border-green-500');
+        npcBtn.classList.remove('bg-slate-800', 'text-slate-500', 'border-transparent');
+        playerBtn.classList.add('bg-slate-800', 'text-slate-500', 'border-transparent');
+        playerBtn.classList.remove('bg-slate-700', 'text-slate-300', 'border-green-500');
+        npcTargets.classList.remove('hidden');
+        playerTargets.classList.add('hidden');
+    } else {
+        playerBtn.classList.add('bg-slate-700', 'text-slate-300', 'border-green-500');
+        playerBtn.classList.remove('bg-slate-800', 'text-slate-500', 'border-transparent');
+        npcBtn.classList.add('bg-slate-800', 'text-slate-500', 'border-transparent');
+        npcBtn.classList.remove('bg-slate-700', 'text-slate-300', 'border-green-500');
+        npcTargets.classList.add('hidden');
+        playerTargets.classList.remove('hidden');
+    }
+}
+
+export async function searchEspionageTargets() {
+    const input = document.getElementById('spy-player-search-input');
+    const resultsDiv = document.getElementById('spy-player-search-results');
+    const searchTerm = input.value.trim();
+    
+    if (!searchTerm) {
+        resultsDiv.innerHTML = '<p class="text-slate-500 text-[10px] text-center py-2">Enter a username to search</p>';
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<p class="text-slate-400 text-[10px] text-center py-2">Searching...</p>';
+    
+    try {
+        const token = localStorage.getItem('authToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch(
+            `http://localhost:3001/api/players?search=${encodeURIComponent(searchTerm)}&limit=10&excludeSelf=true`,
+            { headers }
+        );
+        const result = await response.json();
+        
+        if (!result.success || !result.players) {
+            throw new Error('Failed to search players');
+        }
+        
+        if (result.players.length === 0) {
+            resultsDiv.innerHTML = '<p class="text-slate-500 text-[10px] text-center py-2">No players found</p>';
+            return;
+        }
+        
+        resultsDiv.innerHTML = result.players.map(player => `
+            <div 
+                onclick="game.selectEspionageTarget('${player.username}')" 
+                class="bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600 rounded p-2 cursor-pointer transition-colors"
+            >
+                <p class="text-white text-[10px] font-bold">${player.username}</p>
+                <p class="text-slate-400 text-[9px]">${player.totalMilitary} troops | Day ${player.dayCount}</p>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error searching players:', error);
+        resultsDiv.innerHTML = '<p class="text-red-400 text-[10px] text-center py-2">Search failed</p>';
+    }
+}
+
+export function selectEspionageTarget(username) {
+    document.getElementById('spy-selected-player').value = username;
+    document.getElementById('spy-selected-player-name').textContent = username;
+    document.getElementById('spy-selected-player-display').classList.remove('hidden');
+    document.getElementById('spy-player-search-results').innerHTML = 
+        '<p class="text-green-400 text-[10px] text-center py-2">✓ Target selected</p>';
+}
+
+export function clearEspionageTarget() {
+    document.getElementById('spy-selected-player').value = '';
+    document.getElementById('spy-selected-player-display').classList.add('hidden');
+    document.getElementById('spy-player-search-results').innerHTML = 
+        '<p class="text-slate-500 text-[10px] text-center py-2">Search for a player to target</p>';
+}
+
+// ============================================
+// PLAYER PROFILE  
+// ============================================
+
+export async function viewPlayerProfile(username) {
+    const modal = document.getElementById('player-profile-modal');
+    const loading = document.getElementById('profile-loading');
+    const content = document.getElementById('profile-content');
+    const error = document.getElementById('profile-error');
+    
+    // Show modal and loading state
+    modal.classList.add('open');
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    error.classList.add('hidden');
+    document.getElementById('profile-username').textContent = username;
+    
+    try {
+        const response = await fetch(`http://localhost:3001/api/player/${encodeURIComponent(username)}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.player) {
+            throw new Error('Failed to load player data');
+        }
+        
+        const player = result.player;
+        
+        // Update profile fields
+        document.getElementById('profile-created').textContent = new Date(player.created_at).toLocaleDateString();
+        document.getElementById('profile-days').textContent = player.day_count || 0;
+        document.getElementById('profile-spearmen').textContent = (player.military_spearmen || 0).toLocaleString();
+        document.getElementById('profile-archers').textContent = (player.military_archers || 0).toLocaleString();
+        document.getElementById('profile-chulls').textContent = (player.military_chulls || 0).toLocaleString();
+        document.getElementById('profile-shardbearers').textContent = (player.military_shardbearers || 0).toLocaleString();
+        document.getElementById('profile-markets').textContent = (player.buildings_market || 0).toLocaleString();
+        
+        const totalMilitary = (player.military_spearmen || 0) + (player.military_archers || 0) + 
+                             (player.military_chulls || 0) + (player.military_shardbearers || 0);
+        document.getElementById('profile-total-military').textContent = totalMilitary.toLocaleString();
+        
+        const totalBuildings = (player.buildings_market || 0);
+        document.getElementById('profile-total-buildings').textContent = totalBuildings.toLocaleString();
+        
+        // Show content
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        
+    } catch (err) {
+        console.error('Error loading player profile:', err);
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+    }
+}
+
+export function targetPlayerForEspionage(username) {
+    // Close profile modal
+    document.getElementById('player-profile-modal').classList.remove('open');
+    
+    // Open spy modal and set to player targeting mode
+    const spyModal = document.getElementById('spy-modal');
+    spyModal.classList.add('open');
+    
+    // Switch to player targeting mode
+    setEspionageTargetType('player');
+    
+    // Pre-select the player
+    selectEspionageTarget(username);
+}

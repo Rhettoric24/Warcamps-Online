@@ -541,3 +541,44 @@ button:disabled {
         opacity: 0.85;
     }
 }
+
+/* Authentication Tab Styles */
+.auth-tab-active {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    color: white;
+    text-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+.auth-tab-inactive {
+    background: transparent;
+    color: #94a3b8;
+}
+
+.auth-tab-inactive:hover {
+    background: rgba(30, 64, 175, 0.2);
+    color: #cbd5e1;
+}
+
+/* Rankings Metric Buttons */
+.ranking-metric-btn {
+    background: rgba(30, 41, 59, 0.6);
+    color: #94a3b8;
+    border: 1px solid #334155;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: bold;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.ranking-metric-btn:hover {
+    background: rgba(30, 41, 59, 0.9);
+    color: #cbd5e1;
+}
+
+.ranking-metric-btn.active {
+    background: rgba(234, 179, 8, 0.2);
+    color: #fbbf24;
+    border-color: #ca8a04;
+}

@@ -105,7 +105,7 @@ export function resolveRun(gameState) {
     log("The Coalition has departed for the Plateau.", "text-slate-400 italic");
 
     if (run.playerForces) {
-        const durationMs = 2 * CONSTANTS.DAY_MS;
+        const durationMs = 2 * CONSTANTS.DAY_MS * 24; // Convert to game milliseconds (24x speed)
         gameState.state.deployments.push({
             id: getCurrentGameTime(),
             type: 'run',
