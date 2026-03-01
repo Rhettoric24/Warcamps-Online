@@ -18,7 +18,7 @@ const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, ge
 // Middleware
 app.use(cors({
   origin: [
-    'https://Rhettoric24.github.io',        // GitHub Pages deployment
+    'https://rhettoric24.github.io',        // GitHub Pages deployment (lowercase!)
     'http://localhost:3000',                 // Local dev (if needed)
     'http://localhost:3001',                 // Local dev server
     'http://localhost:5500',                 // VS Code Live Server
