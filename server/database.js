@@ -226,10 +226,11 @@ async function updatePlayerState(playerId, gameState) {
       }
     }
 
-    // Preserve server-authoritative land/buildings; override client values
+    // Use client buildings (buildings are just stored, not server-authoritative)
+    const clientBuildings = gameState.buildings || serverBuildings;
     const mergedGameState = { ...gameState };
     mergedGameState.maxLand = serverMaxLand;
-    mergedGameState.buildings = { ...serverBuildings };
+    mergedGameState.buildings = { ...clientBuildings };
 
     await pool.query(
       `UPDATE players SET 
@@ -268,15 +269,15 @@ async function updatePlayerState(playerId, gameState) {
         gameState.military?.noble || 0,
         gameState.military?.spy || 0,
         gameState.military?.ghostblood || 0,
-        serverBuildings.market || 0,
-        serverBuildings.training_camp || 0,
-        serverBuildings.monastery || 0,
-        serverBuildings.soulcaster || 0,
-        serverBuildings.shelter || 0,
-        serverBuildings.spy_network || 0,
-        serverBuildings.research_library || 0,
-        serverBuildings.stormshelter || 0,
-        serverBuildings.whisper_tower || 0,
+        clientBuildings.market || 0,
+        clientBuildings.training_camp || 0,
+        clientBuildings.monastery || 0,
+        clientBuildings.soulcaster || 0,
+        clientBuildings.shelter || 0,
+        clientBuildings.spy_network || 0,
+        clientBuildings.research_library || 0,
+        clientBuildings.stormshelter || 0,
+        clientBuildings.whisper_tower || 0,
         gameState.dayCount || 0,
         gameState.lastTickTime || 0,
         JSON.stringify(mergedGameState),
