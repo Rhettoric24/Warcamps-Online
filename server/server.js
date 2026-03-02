@@ -745,6 +745,33 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+/**
+ * GET /api/config
+ * Returns configuration including the correct server URL for API calls
+ * This allows the frontend to work in both local development and production
+ */
+app.get('/api/config', (req, res) => {
+  // Determine the correct server URL based on the request hostname
+  let serverUrl;
+  const host = req.get('host');
+  const protocol = req.protocol;
+  
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    // Local development
+    serverUrl = `${protocol}://${host}`;
+  } else {
+    // Production deployment (e.g., Railway)
+    serverUrl = `${protocol}://${host}`;
+  }
+  
+  res.json({
+    success: true,
+    serverUrl,
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
 // ============================================
 // MESSAGING ENDPOINTS
 // ============================================

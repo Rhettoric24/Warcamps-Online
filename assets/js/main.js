@@ -1,8 +1,9 @@
+
 // Main entry point for Warcamp Simulator
 import { CONSTANTS, NPC_PRINCES, DEV_MODE, BUILDING_DATA } from './core/constants.js';
 import { createGameState, loadGameState, saveGameState, applyStateSnapshot } from './core/game-state.js';
 import { initializeServerConnection, getCurrentGameTime, syncWithServer, gameMsToDays, formatGameTime, getTimeUntilNextDay } from './core/server-api.js';
-import { registerPlayer, loginPlayer, logoutPlayer, getCurrentPlayer, restoreSession, loadPlayerState, savePlayerState } from './core/auth.js';
+import { registerPlayer, loginPlayer, logoutPlayer, getCurrentPlayer, restoreSession, loadPlayerState, savePlayerState, initializeServerUrl } from './core/auth.js';
 
 // Log DEV_MODE status immediately on load
 console.log('%c🎮 WARCAMP SIMULATOR LOADED', 'background: #1e3a8a; color: #00f2ff; font-weight: bold; padding: 8px; font-size: 14px;');
@@ -139,7 +140,11 @@ const gameInstance = {
     async startGame(player) {
         document.getElementById('player-name-display').innerText = player.username;
         
-        // Connect to server before starting game
+        // Initialize server URL configuration based on where app is hosted
+        log('Initializing server connection...', 'text-cyan-400');
+        await initializeServerUrl();
+        
+        // Connect to server
         log('Connecting to server...', 'text-cyan-400');
         const connected = await initializeServerConnection();
         if (!connected) {

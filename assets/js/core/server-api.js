@@ -1,14 +1,8 @@
 // Server API communication module
 // Handles all communication with the Railway backend server
 
-// Detect if running locally or on production
-const SERVER_URL = (() => {
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:3001';
-  }
-  return 'https://warcamps-online-production.up.railway.app';
-})();
+// Import SERVER_URL initialization from auth module
+import { initializeServerUrl, getServerUrl } from './auth.js';
 
 // Server time state
 let serverTimeCache = {
@@ -27,7 +21,7 @@ let serverTimeCache = {
  */
 export async function fetchServerTime() {
     try {
-        const response = await fetch(`${SERVER_URL}/api/time`);
+        const response = await fetch(`${getServerUrl()}/api/time`);
         if (!response.ok) {
             throw new Error(`Server returned ${response.status}`);
         }
@@ -199,12 +193,12 @@ export function getGameYear() {
  */
 export async function checkServerStatus() {
     try {
-        const response = await fetch(`${SERVER_URL}/api/status`, { timeout: 5000 });
+        const response = await fetch(`${getServerUrl()}/api/status`, { timeout: 5000 });
         return response.ok;
     } catch (error) {
         return false;
     }
 }
 
-// Export server URL for reference
-export { SERVER_URL };
+// Export server URL getter for compatibility
+export { getServerUrl as SERVER_URL, initializeServerUrl };

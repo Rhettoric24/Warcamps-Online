@@ -1,12 +1,40 @@
 // Authentication Module
 // Handles login, registration, and session management
 
-// Use localhost for development, Railway for production
-export const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:3001'
-    : 'https://warcamps-online-production.up.railway.app';
+// SERVER_URL is determined by fetching /api/config from wherever the app is hosted
+// This allows the same code to work in development (localhost) and production (Railway, etc)
+let SERVER_URL = null;
 
-const API_URL = `${SERVER_URL}/api`;
+export async function initializeServerUrl() {
+  if (SERVER_URL) return SERVER_URL;
+  
+  try {
+    // First, try to get config from current origin
+    const currentOrigin = window.location.origin;
+    const response = await fetch(`${currentOrigin}/api/config`);
+    const data = await response.json();
+    SERVER_URL = data.serverUrl || currentOrigin;
+  } catch (error) {
+    // Fallback: use current origin
+    console.warn('Failed to fetch server config, using current origin');
+    SERVER_URL = window.location.origin;
+  }
+  
+  return SERVER_URL;
+}
+
+export function getServerUrl() {
+  if (!SERVER_URL) {
+    // Emergency fallback if initializeServerUrl wasn't called
+    return window.location.origin;
+  }
+  return SERVER_URL;
+}
+
+export function getApiUrl() {
+  return `${getServerUrl()}/api`;
+}
+
 const TOKEN_REFRESH_THRESHOLD_MS = 15 * 60 * 1000;
 
 // Store current player session
@@ -42,7 +70,7 @@ async function refreshAuthToken() {
     }
 
     try {
-        const response = await fetch(`${API_URL}/auth/refresh`, {
+        const response = await fetch(`${getApiUrl()}/auth/refresh`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`
@@ -103,7 +131,7 @@ export async function authFetch(url, options = {}, retryOn401 = true) {
  */
 export async function registerPlayer(username, password) {
     try {
-        const response = await fetch(`${API_URL}/auth/register`, {
+        const response = await fetch(`${getApiUrl()}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
@@ -133,7 +161,7 @@ export async function registerPlayer(username, password) {
  */
 export async function loginPlayer(username, password) {
     try {
-        const response = await fetch(`${API_URL}/auth/login`, {
+        const response = await fetch(`${getApiUrl()}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
@@ -234,7 +262,7 @@ export async function restoreSession() {
             username: session.username
         };
 
-        const response = await authFetch(`${API_URL}/auth/me`, { method: 'GET' });
+        const response = await authFetch(`${getApiUrl()}/auth/me`, { method: 'GET' });
         const data = await response.json();
 
         if (response.ok && data.player) {
@@ -261,7 +289,7 @@ export async function restoreSession() {
  */
 export async function loadPlayerState(playerId, username) {
     try {
-        const response = await authFetch(`${API_URL}/player/${playerId}/state`, {
+        const response = await authFetch(`${getApiUrl()}/player/${playerId}/state`, {
             method: 'GET'
         });
         const data = await response.json();
@@ -286,7 +314,7 @@ export async function loadPlayerState(playerId, username) {
  */
 export async function savePlayerState(playerId, username, gameState) {
     try {
-        const response = await authFetch(`${API_URL}/player/${playerId}/state`, {
+        const response = await authFetch(`${getApiUrl()}/player/${playerId}/state`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
