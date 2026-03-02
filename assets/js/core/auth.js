@@ -66,7 +66,7 @@ async function refreshAuthToken() {
     }
 }
 
-async function authFetch(url, options = {}, retryOn401 = true) {
+export async function authFetch(url, options = {}, retryOn401 = true) {
     if (!authToken) {
         throw new Error('Missing auth token');
     }

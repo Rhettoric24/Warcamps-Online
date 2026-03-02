@@ -65,6 +65,31 @@ async function initializeDatabase() {
       );
     `);
     
+    // Create player_messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS player_messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        recipient_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        read BOOLEAN DEFAULT FALSE,
+        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        
+        CONSTRAINT different_users CHECK (sender_id != recipient_id)
+      );
+    `);
+    
+    // Create index for faster message queries
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_recipient 
+      ON player_messages(recipient_id, sent_at DESC);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+      ON player_messages(sender_id, recipient_id, sent_at DESC);
+    `);
+    
     console.log('✅ Database schema initialized');
     return true;
   } catch (error) {
@@ -668,6 +693,158 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
 }
 
 /**
+ * Send a message from one player to another
+ */
+async function sendPlayerMessage(senderId, recipientUsername, messageText) {
+  try {
+    // Get recipient player
+    const recipientResult = await pool.query(
+      'SELECT id FROM players WHERE username = $1',
+      [recipientUsername]
+    );
+    
+    if (recipientResult.rows.length === 0) {
+      return { success: false, error: 'Recipient not found' };
+    }
+    
+    const recipientId = recipientResult.rows[0].id;
+    
+    // Check if trying to message self
+    if (senderId === recipientId) {
+      return { success: false, error: 'Cannot send message to yourself' };
+    }
+    
+    // Insert message
+    const result = await pool.query(
+      `INSERT INTO player_messages (sender_id, recipient_id, message)
+       VALUES ($1, $2, $3)
+       RETURNING id, sent_at`,
+      [senderId, recipientId, messageText]
+    );
+    
+    return {
+      success: true,
+      messageId: result.rows[0].id,
+      sentAt: result.rows[0].sent_at
+    };
+  } catch (error) {
+    console.error('Send message error:', error);
+    return { success: false, error: 'Failed to send message' };
+  }
+}
+
+/**
+ * Get inbox messages for a player
+ */
+async function getPlayerInbox(playerId, limit = 50) {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        m.id,
+        m.message,
+        m.read,
+        m.sent_at,
+        p.username as sender_username
+       FROM player_messages m
+       JOIN players p ON m.sender_id = p.id
+       WHERE m.recipient_id = $1
+       ORDER BY m.sent_at DESC
+       LIMIT $2`,
+      [playerId, limit]
+    );
+    
+    return { success: true, messages: result.rows };
+  } catch (error) {
+    console.error('Get inbox error:', error);
+    return { success: false, error: 'Failed to retrieve messages' };
+  }
+}
+
+/**
+ * Get conversation between two users
+ */
+async function getConversation(playerId, otherUsername, limit = 50) {
+  try {
+    // Get other player ID
+    const otherPlayerResult = await pool.query(
+      'SELECT id FROM players WHERE username = $1',
+      [otherUsername]
+    );
+    
+    if (otherPlayerResult.rows.length === 0) {
+      return { success: false, error: 'Player not found' };
+    }
+    
+    const otherPlayerId = otherPlayerResult.rows[0].id;
+    
+    // Get conversation messages
+    const result = await pool.query(
+      `SELECT 
+        m.id,
+        m.message,
+        m.read,
+        m.sent_at,
+        m.sender_id = $1 as is_mine,
+        CASE 
+          WHEN m.sender_id = $1 THEN p2.username
+          ELSE p1.username
+        END as other_username
+       FROM player_messages m
+       LEFT JOIN players p1 ON m.sender_id = p1.id
+       LEFT JOIN players p2 ON m.recipient_id = p2.id
+       WHERE (m.sender_id = $1 AND m.recipient_id = $2)
+          OR (m.sender_id = $2 AND m.recipient_id = $1)
+       ORDER BY m.sent_at DESC
+       LIMIT $3`,
+      [playerId, otherPlayerId, limit]
+    );
+    
+    return { success: true, messages: result.rows, otherUsername };
+  } catch (error) {
+    console.error('Get conversation error:', error);
+    return { success: false, error: 'Failed to retrieve conversation' };
+  }
+}
+
+/**
+ * Mark messages as read
+ */
+async function markMessagesAsRead(playerId, messageIds) {
+  try {
+    await pool.query(
+      `UPDATE player_messages 
+       SET read = TRUE 
+       WHERE recipient_id = $1 AND id = ANY($2::int[])`,
+      [playerId, messageIds]
+    );
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Mark messages read error:', error);
+    return { success: false, error: 'Failed to mark messages as read' };
+  }
+}
+
+/**
+ * Get unread message count
+ */
+async function getUnreadMessageCount(playerId) {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) as unread_count
+       FROM player_messages
+       WHERE recipient_id = $1 AND read = FALSE`,
+      [playerId]
+    );
+    
+    return { success: true, count: parseInt(result.rows[0].unread_count, 10) };
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    return { success: false, count: 0 };
+  }
+}
+
+/**
  * Close database connection
  */
 async function closePool() {
@@ -687,5 +864,10 @@ module.exports = {
   getRankings,
   sabotagePlayer,
   transferConquestLand,
+  sendPlayerMessage,
+  getPlayerInbox,
+  getConversation,
+  markMessagesAsRead,
+  getUnreadMessageCount,
   closePool
 };

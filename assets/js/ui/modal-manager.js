@@ -1,4 +1,5 @@
 // Modal management for system-specific pop-out windows
+import { loadPlayerMessages } from './ui-manager.js';
 
 const modals = {
     build: document.getElementById('build-modal'),
@@ -228,4 +229,9 @@ export function setSpanreedTab(tabName) {
     
     if (reportsContent) reportsContent.classList.toggle('hidden', tabName !== 'reports');
     if (messagesContent) messagesContent.classList.toggle('hidden', tabName !== 'messages');
+    
+    // Load messages when switching to messages tab
+    if (tabName === 'messages') {
+        loadPlayerMessages();
+    }
 }

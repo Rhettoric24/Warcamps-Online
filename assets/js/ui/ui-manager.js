@@ -3,7 +3,7 @@ import { CONSTANTS, BUILDING_DATA, FABRIAL_DATA, NPC_PRINCES } from '../core/con
 import { getArmyStats, getAvailableTroops, getSpyPower } from '../military/military.js';
 import { getBuildingCost } from '../buildings/buildings.js';
 import { formatTime } from '../core/utils.js';
-import { SERVER_URL } from '../core/auth.js';
+import { SERVER_URL, authFetch } from '../core/auth.js';
 import { getCurrentGameTime, formatGameTime, getTimeUntilNextDay } from '../core/server-api.js';
 import { updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket } from './modal-manager.js';
 import { generateThrillButtons } from '../arena/arena.js';
@@ -961,51 +961,100 @@ export function closeMissionDetailsModal() {
     if (modal) modal.classList.remove('open');
 }
 
-export function sendSpanreedMessage(gameState) {
+export async function sendSpanreedMessage() {
     const input = document.getElementById('message-input');
-    const recipientSelect = document.getElementById('message-recipient');
+    const recipientInput = document.getElementById('message-recipient');
     
-    if (!input || !recipientSelect || !input.value.trim()) return;
-    
-    const message = {
-        from: 'You',
-        to: recipientSelect.options[recipientSelect.selectedIndex].text,
-        text: input.value.trim(),
-        timestamp: Date.now()
-    };
-    
-    gameState.state.messages.unshift(message);
-    
-    // Keep only last 50 messages
-    if (gameState.state.messages.length > 50) {
-        gameState.state.messages = gameState.state.messages.slice(0, 50);
-    }
-    
-    input.value = '';
-    updateMessagesList(gameState);
-}
-
-export function updateMessagesList(gameState) {
-    const list = document.getElementById('messages-list');
-    if (!list) return;
-    
-    if (gameState.state.messages.length === 0) {
-        list.innerHTML = '<p class="text-slate-500 text-sm italic text-center py-8">No messages yet. Send a spanreed to another Highprince.</p>';
+    if (!input || !recipientInput || !input.value.trim() || !recipientInput.value.trim()) {
+        alert('Please enter a recipient username and message');
         return;
     }
     
-    list.innerHTML = gameState.state.messages.map(msg => {
-        const time = new Date(msg.timestamp).toLocaleTimeString();
-        return `
-            <div class="bg-slate-900/50 border border-cyan-500/30 rounded p-3">
-                <div class="flex justify-between items-start mb-1">
-                    <span class="text-cyan-400 text-xs font-bold">${msg.from} → ${msg.to}</span>
-                    <span class="text-slate-500 text-[10px]">${time}</span>
+    try {
+        const response = await authFetch(`${SERVER_URL}/api/messages/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                recipientUsername: recipientInput.value.trim(),
+                message: input.value.trim()
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            alert(data.error || 'Failed to send message');
+            return;
+        }
+        
+        input.value = '';
+        recipientInput.value = '';
+        
+        // Reload messages to show the sent message
+        await loadPlayerMessages();
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Failed to send message');
+    }
+}
+
+export async function loadPlayerMessages() {
+    const list = document.getElementById('messages-list');
+    if (!list) return;
+    
+    try {
+        const response = await authFetch(`${SERVER_URL}/api/messages/inbox?limit=50`);
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            list.innerHTML = '<p class="text-red-500 text-sm text-center py-8">Failed to load messages</p>';
+            return;
+        }
+        
+        if (data.messages.length === 0) {
+            list.innerHTML = '<p class="text-slate-500 text-sm italic text-center py-8">No messages yet. Send a spanreed to another player.</p>';
+            return;
+        }
+        
+        list.innerHTML = data.messages.map(msg => {
+            const time = new Date(msg.sent_at).toLocaleString();
+            const isUnread = !msg.read;
+            
+            return `
+                <div class="bg-slate-900/50 border ${isUnread ? 'border-cyan-400/50' : 'border-cyan-500/30'} rounded p-3 ${isUnread ? 'shadow-lg shadow-cyan-500/20' : ''}">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-cyan-400 text-xs font-bold">
+                            ${isUnread ? '🟢 ' : ''}From: ${msg.sender_username}
+                        </span>
+                        <span class="text-slate-500 text-[10px]">${time}</span>
+                    </div>
+                    <p class="text-slate-300 text-sm">${msg.message}</p>
                 </div>
-                <p class="text-slate-300 text-sm">${msg.text}</p>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+        
+        // Mark messages as read
+        const unreadIds = data.messages.filter(m => !m.read).map(m => m.id);
+        if (unreadIds.length > 0) {
+            authFetch(`${SERVER_URL}/api/messages/mark-read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ messageIds: unreadIds })
+            }).catch(err => console.error('Failed to mark messages as read:', err));
+        }
+    } catch (error) {
+        console.error('Error loading messages:', error);
+        list.innerHTML = '<p class="text-red-500 text-sm text-center py-8">Failed to load messages</p>';
+    }
+}
+
+export function updateMessagesList(gameState) {
+    // Now just calls loadPlayerMessages
+    loadPlayerMessages();
 }
 
 // ============================================
@@ -1506,5 +1555,49 @@ export function startConquestOnPlayer(username) {
                 }
             }
         }, 100);
+    }
+}
+// ============================================
+// MESSAGE POLLING
+// ============================================
+
+let messagePollingInterval = null;
+
+export async function updateUnreadMessageCount() {
+    try {
+        const response = await authFetch(`/api/messages/unread-count`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            const badge = document.getElementById('unread-message-badge');
+            if (badge) {
+                if (data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching unread count:', error);
+    }
+}
+
+export function startMessagePolling() {
+    // Initial check
+    updateUnreadMessageCount();
+    
+    // Poll every 30 seconds
+    if (messagePollingInterval) {
+        clearInterval(messagePollingInterval);
+    }
+    messagePollingInterval = setInterval(updateUnreadMessageCount, 30000);
+}
+
+export function stopMessagePolling() {
+    if (messagePollingInterval) {
+        clearInterval(messagePollingInterval);
+        messagePollingInterval = null;
     }
 }

@@ -777,8 +777,9 @@
                 <div class="warcamp-panel p-6 h-64 flex flex-col items-center justify-center">
                     <h2 class="text-xl font-cinzel text-cyan-400 mb-4">SPANREED CENTER</h2>
                     <p class="text-slate-400 text-sm mb-4 text-center">View reports from espionage, battles, and daily growth. Send messages to other Highprinces.</p>
-                    <button onclick="game.openSpanreedModal()" class="btn-alethi px-6 py-3 rounded font-bold">
+                    <button onclick="game.openSpanreedModal()" class="btn-alethi px-6 py-3 rounded font-bold relative">
                         OPEN SPANREED
+                        <span id="unread-message-badge" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">0</span>
                     </button>
                 </div>
             </section>
@@ -1640,16 +1641,10 @@
                 <div class="border-t border-slate-700 pt-4 mt-4">
                     <div class="flex gap-2 mb-2">
                         <label class="text-xs text-slate-400 self-center">To:</label>
-                        <select id="message-recipient" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-300 flex-grow">
-                            <option value="dalinar">Dalinar Kholin</option>
-                            <option value="sadeas">Torol Sadeas</option>
-                            <option value="aladar">Aladar</option>
-                            <option value="roion">Roion</option>
-                            <option value="sebarial">Sebarial</option>
-                        </select>
+                        <input id="message-recipient" type="text" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-slate-300 flex-grow" placeholder="Enter player username...">
                     </div>
                     <div class="flex gap-2">
-                        <input id="message-input" type="text" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 flex-grow text-sm text-slate-200" placeholder="Write your message...">
+                        <input id="message-input" type="text" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 flex-grow text-sm text-slate-200" placeholder="Write your message..." maxlength="500">
                         <button onclick="game.sendSpanreedMessage()" class="btn-alethi px-4 py-2 rounded text-sm font-bold">SEND</button>
                     </div>
                 </div>

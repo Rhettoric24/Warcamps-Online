@@ -13,7 +13,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Import database
-const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand } = require('./database');
+const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand, sendPlayerMessage, getPlayerInbox, getConversation, markMessagesAsRead, getUnreadMessageCount } = require('./database');
 
 // Middleware
 app.use(cors({
@@ -699,6 +699,132 @@ app.get('/api/status', (req, res) => {
     message: 'Warcamps server is running',
     uptime: Date.now() - serverStartRealTime
   });
+});
+
+// ============================================
+// MESSAGING ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/messages/send
+ * Send a message to another player
+ */
+app.post('/api/messages/send', requireAuth, async (req, res) => {
+  try {
+    const { recipientUsername, message } = req.body;
+    const senderId = req.auth.playerId;
+
+    if (!recipientUsername || !message) {
+      return res.status(400).json({ success: false, error: 'recipientUsername and message are required' });
+    }
+
+    if (message.length > 500) {
+      return res.status(400).json({ success: false, error: 'Message too long (max 500 characters)' });
+    }
+
+    const result = await sendPlayerMessage(senderId, recipientUsername, message);
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({ success: false, error: 'Failed to send message' });
+  }
+});
+
+/**
+ * GET /api/messages/inbox
+ * Get player's inbox (received messages)
+ */
+app.get('/api/messages/inbox', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const result = await getPlayerInbox(playerId, limit);
+    
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching inbox:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch inbox' });
+  }
+});
+
+/**
+ * GET /api/messages/conversation/:username
+ * Get conversation with a specific player
+ */
+app.get('/api/messages/conversation/:username', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+    const otherUsername = req.params.username;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const result = await getConversation(playerId, otherUsername, limit);
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching conversation:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch conversation' });
+  }
+});
+
+/**
+ * POST /api/messages/mark-read
+ * Mark messages as read
+ */
+app.post('/api/messages/mark-read', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+    const { messageIds } = req.body;
+
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'messageIds must be a non-empty array' });
+    }
+
+    const result = await markMessagesAsRead(playerId, messageIds);
+    
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark messages as read' });
+  }
+});
+
+/**
+ * GET /api/messages/unread-count
+ * Get count of unread messages
+ */
+app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+
+    const result = await getUnreadMessageCount(playerId);
+    
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch unread count' });
+  }
 });
 
 // ============================================
