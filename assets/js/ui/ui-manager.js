@@ -1625,7 +1625,7 @@ let messagePollingInterval = null;
 
 export async function updateUnreadMessageCount() {
     try {
-        const response = await authFetch(`/api/messages/unread-count`);
+        const response = await authFetch(`${SERVER_URL}/api/messages/unread-count`);
         const data = await response.json();
         
         if (response.ok && data.success) {
