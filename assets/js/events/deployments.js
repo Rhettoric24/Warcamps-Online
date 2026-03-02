@@ -659,10 +659,16 @@ export function resolveMission(gameState, deployment) {
         // Use stored power or recalculate
         const playerPower = deployment.power || power;
         const enemyPower = deployment.enemyPower;
-        const landReward = deployment.landReward;
+        let landReward = deployment.landReward;
         
         // Deterministic conquest: attacker wins only if power strictly beats defender
         const victory = playerPower > enemyPower;
+        
+        // Safety check: ensure victory always gives at least 10 land
+        if (victory && landReward < 10) {
+            console.warn(`Victory with landReward < 10 detected. Fixing: ${landReward} → 10`);
+            landReward = 10;
+        }
         
         // Check for archer protection
         const archerProtection = getArcherProtection(deployment.units);

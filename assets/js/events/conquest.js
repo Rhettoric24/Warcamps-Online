@@ -132,9 +132,12 @@ export function calculateNPCPower(npcKey) {
 
 /**
  * Calculate land reward based on victory margin
- * Base: 10 land
- * Bonus: +1 land per 10 power of victory margin
- * Capped at max 25 land total
+ * Tiered system makes it harder to reach higher rewards:
+ * - 0-19 power margin: 10 land
+ * - 20-49 power margin: 12 land
+ * - 50-99 power margin: 15 land
+ * - 100-249 power margin: 20 land
+ * - 250+ power margin: 25 land
  */
 export function calculateLandReward(playerPower, enemyPower) {
     if (playerPower <= enemyPower) {
@@ -142,10 +145,19 @@ export function calculateLandReward(playerPower, enemyPower) {
     }
     
     const margin = playerPower - enemyPower;
-    const bonus = Math.floor(margin / 10);
-    const totalLand = Math.min(10 + bonus, 25);
     
-    return totalLand;
+    // Tiered reward system - harder to farm land
+    if (margin < 20) {
+        return 10;
+    } else if (margin < 50) {
+        return 12;
+    } else if (margin < 100) {
+        return 15;
+    } else if (margin < 250) {
+        return 20;
+    } else {
+        return 25;
+    }
 }
 
 /**

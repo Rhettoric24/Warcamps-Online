@@ -541,12 +541,9 @@ export function updateConquestUI(gameState) {
         const progressBar = document.getElementById('conquest-progress-bar');
         if (progressBar) progressBar.style.width = status.progress + '%';
         
-        // Update enemy and reward info
+        // Update enemy power info
         const enemyPower = document.getElementById('conquest-enemy-power');
         if (enemyPower) enemyPower.textContent = status.enemyPower;
-        
-        const landReward = document.getElementById('conquest-land-reward');
-        if (landReward) landReward.textContent = status.landReward;
         
         // Disable button
         if (btn) {
