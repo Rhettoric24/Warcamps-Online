@@ -13,7 +13,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Import database
-const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, searchPlayers, getRankings } = require('./database');
+const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand } = require('./database');
 
 // Middleware
 app.use(cors({
@@ -55,6 +55,45 @@ function requireAuth(req, res, next) {
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
+}
+
+const LEADERBOARD_SNAPSHOT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const LEADERBOARD_METRICS = ['spheres', 'military', 'land', 'days'];
+let leaderboardSnapshot = {
+  generatedAt: 0,
+  nextUpdateAt: 0,
+  data: {}
+};
+
+function toLeaderboardRows(rankings) {
+  return rankings.map((p) => ({
+    username: p.username,
+    spheres: p.spheres,
+    totalMilitary: (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
+    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0) + (p.buildings_monastery || 0) + (p.buildings_soulcaster || 0) + (p.buildings_spy_network || 0) + (p.buildings_research_library || 0) + (p.buildings_stormshelter || 0) + (p.buildings_whisper_tower || 0),
+    dayCount: p.day_count,
+    rankValue: p.rank_value
+  }));
+}
+
+function isLeaderboardSnapshotExpired() {
+  return !leaderboardSnapshot.generatedAt || Date.now() >= leaderboardSnapshot.nextUpdateAt;
+}
+
+async function refreshLeaderboardSnapshot() {
+  const nextData = {};
+
+  for (const metric of LEADERBOARD_METRICS) {
+    const rankings = await getRankings(metric, 100);
+    nextData[metric] = toLeaderboardRows(rankings);
+  }
+
+  const now = Date.now();
+  leaderboardSnapshot = {
+    generatedAt: now,
+    nextUpdateAt: now + LEADERBOARD_SNAPSHOT_INTERVAL_MS,
+    data: nextData
+  };
 }
 
 // ============================================
@@ -288,16 +327,40 @@ app.get('/api/player/:username', async (req, res) => {
   }
   
   // Return only public data
+  const fabrials = player.game_data?.fabrials || {};
   res.json({
     success: true,
     player: {
       username: player.username,
       created_at: player.created_at,
+      spheres: player.spheres,
+      gemhearts: player.gemhearts,
+      military_bridgecrews: player.military_bridgecrews,
       military_spearmen: player.military_spearmen,
       military_archers: player.military_archers,
       military_shardbearers: player.military_shardbearers,
       military_chulls: player.military_chulls,
+      military_noble: player.military_noble,
+      military_spy: player.military_spy,
+      military_ghostblood: player.military_ghostblood,
       buildings_market: player.buildings_market,
+      buildings_training_camp: player.buildings_training_camp,
+      buildings_shelter: player.buildings_shelter,
+      buildings_monastery: player.buildings_monastery,
+      buildings_soulcaster: player.buildings_soulcaster,
+      buildings_spy_network: player.buildings_spy_network,
+      buildings_research_library: player.buildings_research_library,
+      buildings_stormshelter: player.buildings_stormshelter,
+      buildings_whisper_tower: player.buildings_whisper_tower,
+      fabrials: {
+        heatrial: fabrials.heatrial || 0,
+        ledger: fabrials.ledger || 0,
+        gravity_lift: fabrials.gravity_lift || 0,
+        regen_plate: fabrials.regen_plate || 0,
+        thrill_amp: fabrials.thrill_amp || 0,
+        half_shard: fabrials.half_shard || 0
+      },
+      max_land: player.game_data?.maxLand ?? 25,
       day_count: player.day_count
     }
   });
@@ -385,6 +448,132 @@ app.post('/api/player/:playerId/state', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/sabotage
+ * Execute sabotage mission - deduct resources from target player
+ */
+app.post('/api/sabotage', requireAuth, async (req, res) => {
+  const { targetUsername, resourceType, amount } = req.body || {};
+
+  if (!targetUsername || !resourceType || !amount) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing required fields: targetUsername, resourceType, amount' 
+    });
+  }
+
+  // Validate resource type
+  if (resourceType !== 'spheres' && resourceType !== 'gemhearts') {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid resource type. Must be "spheres" or "gemhearts"' 
+    });
+  }
+
+  // Validate amount
+  const parsedAmount = parseInt(amount, 10);
+  if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Amount must be a positive integer' 
+    });
+  }
+
+  // Prevent self-sabotage
+  if (targetUsername === req.auth.username) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Cannot sabotage yourself' 
+    });
+  }
+
+  // Check if target exists
+  const targetPlayer = await getPlayerByUsername(targetUsername);
+  if (!targetPlayer) {
+    return res.status(404).json({ 
+      success: false, 
+      error: 'Target player not found' 
+    });
+  }
+
+  // Execute sabotage
+  const result = await sabotagePlayer(targetUsername, resourceType, parsedAmount);
+  
+  if (!result.success) {
+    return res.status(500).json({ 
+      success: false, 
+      error: result.message 
+    });
+  }
+
+  res.json({
+    success: true,
+    message: result.message,
+    targetUsername,
+    resourceType,
+    amountStolen: parsedAmount,
+    targetRemaining: result.remaining
+  });
+});
+
+/**
+ * POST /api/conquest-land
+ * Execute PvP land transfer for conquest victory
+ */
+app.post('/api/conquest-land', requireAuth, async (req, res) => {
+  const { targetUsername, landAmount } = req.body || {};
+
+  if (!targetUsername || !landAmount) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: targetUsername, landAmount'
+    });
+  }
+
+  const parsedLand = parseInt(landAmount, 10);
+  if (!Number.isInteger(parsedLand) || parsedLand <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'landAmount must be a positive integer'
+    });
+  }
+
+  if (targetUsername === req.auth.username) {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot conquer land from yourself'
+    });
+  }
+
+  const targetPlayer = await getPlayerByUsername(targetUsername);
+  if (!targetPlayer) {
+    return res.status(404).json({
+      success: false,
+      error: 'Target player not found'
+    });
+  }
+
+  const result = await transferConquestLand(req.auth.username, targetUsername, parsedLand);
+  if (!result.success) {
+    return res.status(400).json({
+      success: false,
+      error: result.message || 'Land transfer failed',
+      actualLandTransferred: result.actualLandTransferred || 0
+    });
+  }
+
+  res.json({
+    success: true,
+    attackerUsername: req.auth.username,
+    targetUsername,
+    landRequested: parsedLand,
+    landTransferred: result.actualLandTransferred,
+    attackerNewMaxLand: result.attackerNewMaxLand,
+    targetNewMaxLand: result.targetNewMaxLand,
+    buildingsDestroyed: result.buildingsDestroyed || []
+  });
+});
+
+/**
  * GET /api/players
  * Search and list players (optionally exclude current user)
  */
@@ -417,8 +606,9 @@ app.get('/api/players', async (req, res) => {
     id: p.id,
     username: p.username,
     spheres: p.spheres,
-    totalMilitary: (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
-    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0),
+    totalMilitary: (p.military_bridgecrews || 0) + (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
+    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0) + (p.buildings_monastery || 0) + (p.buildings_soulcaster || 0) + (p.buildings_spy_network || 0) + (p.buildings_research_library || 0) + (p.buildings_stormshelter || 0) + (p.buildings_whisper_tower || 0),
+    maxLand: p.game_data?.maxLand ?? 25,
     dayCount: p.day_count
   }));
 
@@ -434,24 +624,24 @@ app.get('/api/players', async (req, res) => {
  * Get top players leaderboard by metric
  */
 app.get('/api/rankings', async (req, res) => {
-  const { metric = 'spheres', limit = 20 } = req.query;
-  
-  const rankings = await getRankings(metric, parseInt(limit, 10));
+  const requestedMetric = typeof req.query.metric === 'string' ? req.query.metric : 'spheres';
+  const metric = LEADERBOARD_METRICS.includes(requestedMetric) ? requestedMetric : 'spheres';
+  const requestedLimit = parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(100, requestedLimit)) : 20;
 
-  // Calculate composite stats for each player
-  const leaderboard = rankings.map(p => ({
-    username: p.username,
-    spheres: p.spheres,
-    totalMilitary: (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
-    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0) + (p.buildings_monastery || 0) + (p.buildings_soulcaster || 0) + (p.buildings_spy_network || 0) + (p.buildings_research_library || 0) + (p.buildings_stormshelter || 0) + (p.buildings_whisper_tower || 0),
-    dayCount: p.day_count,
-    rankValue: p.rank_value
-  }));
+  if (isLeaderboardSnapshotExpired()) {
+    await refreshLeaderboardSnapshot();
+  }
+
+  const metricRows = leaderboardSnapshot.data[metric] || [];
+  const leaderboard = metricRows.slice(0, limit);
 
   res.json({
     success: true,
     metric,
-    leaderboard
+    leaderboard,
+    snapshotGeneratedAt: leaderboardSnapshot.generatedAt,
+    nextSnapshotAt: leaderboardSnapshot.nextUpdateAt
   });
 });
 

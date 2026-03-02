@@ -8,6 +8,123 @@ import { resolveSpy } from '../espionage/espionage.js';
 import { addReport } from '../ui/ui-manager.js';
 import { isGravityBoostActive, isGravityBurnout } from './highstorm.js';
 import { calculateEnemyPower, calculateLandReward, calculateNPCPower, calculateLandUsed, handlePlayerLandLoss } from './conquest.js';
+import { SERVER_URL } from '../core/auth.js';
+
+function isPlayerTarget(target) {
+    return typeof target === 'string' && target.startsWith('player:');
+}
+
+function extractPlayerUsername(target) {
+    return isPlayerTarget(target) ? target.slice('player:'.length) : '';
+}
+
+function calculatePublicPlayerPower(playerData) {
+    const units = {
+        bridgecrews: playerData?.military_bridgecrews || 0,
+        spearmen: playerData?.military_spearmen || 0,
+        archers: playerData?.military_archers || 0,
+        shardbearers: playerData?.military_shardbearers || 0,
+        chulls: playerData?.military_chulls || 0
+    };
+
+    let power = 0;
+    for (const unitType of Object.keys(units)) {
+        power += units[unitType] * (UNIT_STATS[unitType]?.power || 0);
+    }
+
+    if (units.shardbearers > 0) {
+        power *= (UNIT_STATS.shardbearers.multiplier * units.shardbearers);
+    }
+
+    return Math.floor(power);
+}
+
+async function fetchPlayerConquestProfile(username) {
+    if (!username) return null;
+
+    try {
+        const response = await fetch(`${SERVER_URL}/api/player/${encodeURIComponent(username)}`);
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.player) return null;
+
+        return {
+            username,
+            power: calculatePublicPlayerPower(result.player),
+            maxLand: Number.isFinite(result.player.max_land) ? result.player.max_land : 25,
+            totalMilitary: (result.player.military_bridgecrews || 0) + (result.player.military_spearmen || 0) + (result.player.military_archers || 0) + (result.player.military_chulls || 0) + (result.player.military_shardbearers || 0)
+        };
+    } catch (error) {
+        console.warn('Failed to fetch player conquest profile:', error);
+        return null;
+    }
+}
+
+async function refreshConquestPlayerTargets(gameState) {
+    const targetSelect = document.getElementById('conquest-target');
+    if (!targetSelect) return;
+
+    const previousValue = targetSelect.value;
+    gameState.state.conquestPlayerTargets = gameState.state.conquestPlayerTargets || {};
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch(`${SERVER_URL}/api/players?limit=15&excludeSelf=true`, { headers });
+        const result = await response.json();
+        if (!response.ok || !result.success || !Array.isArray(result.players)) return;
+
+        Array.from(targetSelect.options)
+            .filter(option => isPlayerTarget(option.value))
+            .forEach(option => option.remove());
+
+        gameState.state.conquestPlayerTargets = {};
+        for (const player of result.players) {
+            const username = player.username;
+            const targetValue = `player:${username}`;
+            gameState.state.conquestPlayerTargets[username] = player;
+
+            const option = document.createElement('option');
+            option.value = targetValue;
+            option.text = `${username} (Land: ${player.maxLand ?? '?'})`;
+            targetSelect.appendChild(option);
+        }
+
+        if (previousValue && Array.from(targetSelect.options).some(option => option.value === previousValue)) {
+            targetSelect.value = previousValue;
+        }
+    } catch (error) {
+        console.warn('Failed to refresh conquest player targets:', error);
+    }
+}
+
+async function executePlayerConquest(targetUsername, landAmount) {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        return { success: false, error: 'You must be logged in to conquer player land.' };
+    }
+
+    const response = await fetch(`${SERVER_URL}/api/conquest-land`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetUsername, landAmount })
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        return { success: false, error: result.error || 'Land transfer failed' };
+    }
+
+    return {
+        success: true,
+        landTransferred: result.landTransferred || 0,
+        attackerNewMaxLand: result.attackerNewMaxLand,
+        targetNewMaxLand: result.targetNewMaxLand,
+        buildingsDestroyed: result.buildingsDestroyed || []
+    };
+}
 
 export function openDeployModal(gameState, type) {
     if (type === 'run') {
@@ -48,6 +165,8 @@ export function openDeployModal(gameState, type) {
                         optionIndex++;
                     }
                 }
+
+                refreshConquestPlayerTargets(gameState).finally(() => updateMissionInfo(gameState));
             }
         }
         
@@ -169,6 +288,11 @@ export function updateMissionInfo(gameState) {
         if (target === 'freeland') {
             targetName = 'Free Land';
             targetLand = gameState.state.freeLandPool || 0;
+        } else if (isPlayerTarget(target)) {
+            const username = extractPlayerUsername(target);
+            const cachedPlayer = gameState.state.conquestPlayerTargets?.[username];
+            targetName = username;
+            targetLand = cachedPlayer?.maxLand ?? -1;
         } else {
             const npc = NPC_PRINCES[target];
             targetName = npc ? npc.name : 'Unknown';
@@ -176,8 +300,10 @@ export function updateMissionInfo(gameState) {
         }
         
         // Don't reveal enemy power until after battle - just show target status
-        if (targetLand <= 0) {
+        if (targetLand === 0) {
             sphereEstimate = `${targetName} has no territory left to conquer.`;
+        } else if (targetLand < 0) {
+            sphereEstimate = `Preparing conquest against ${targetName}... (land intel unavailable)`;
         } else {
             sphereEstimate = `Preparing conquest against ${targetName}...`;
         }
@@ -223,7 +349,7 @@ export function closeDeployModal() {
     document.getElementById('deploy-modal').classList.remove('open');
 }
 
-export function confirmDeploy(gameState) {
+export async function confirmDeploy(gameState) {
     const units = {};
     let total = 0;
     ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'].forEach(u => {
@@ -288,6 +414,13 @@ export function confirmDeploy(gameState) {
                 log("Free land pool is fully depleted. Choose a rival target.", "text-red-400");
                 return;
             }
+        } else if (isPlayerTarget(target)) {
+            const username = extractPlayerUsername(target);
+            const cachedPlayer = gameState.state.conquestPlayerTargets?.[username];
+            if (cachedPlayer && (cachedPlayer.maxLand || 0) <= 0) {
+                log(`${username} has no territory left to conquer. Choose another target.`, "text-red-400");
+                return;
+            }
         } else {
             const npc = NPC_PRINCES[target];
             const rivalLand = gameState.state.npcState?.[target]?.maxLand ?? 25;
@@ -313,6 +446,14 @@ export function confirmDeploy(gameState) {
             enemyPower = calculateEnemyPower(gameState.state.maxLand);
             targetName = 'Free Land';
             targetLand = gameState.state.freeLandPool || 0;
+        } else if (isPlayerTarget(target)) {
+            const targetUsername = extractPlayerUsername(target);
+            const profile = await fetchPlayerConquestProfile(targetUsername);
+            const cachedPlayer = gameState.state.conquestPlayerTargets?.[targetUsername];
+
+            enemyPower = profile?.power ?? calculateEnemyPower(gameState.state.maxLand);
+            targetName = targetUsername;
+            targetLand = profile?.maxLand ?? cachedPlayer?.maxLand ?? 25;
         } else {
             // Player/NPC target uses their at-home power
             const npc = NPC_PRINCES[target];
@@ -330,7 +471,7 @@ export function confirmDeploy(gameState) {
         
         const landReward = calculateLandReward(power, enemyPower);
         
-        const durationMs = CONSTANTS.DAY_MS * 24; // Convert to game milliseconds (24x speed)
+        const durationMs = CONSTANTS.DAY_MS * 24; // 1 game day = 24 hours of game time = 1 hour real time
         const deployment = {
             id: getCurrentGameTime(),
             type: 'conquest',
@@ -352,7 +493,7 @@ export function confirmDeploy(gameState) {
     }
 
     const baseDays = gameState.state.pendingDeployType === 'scout' ? 1 : 1.5;
-    const durationMs = ((baseDays * CONSTANTS.DAY_MS) / speed) * 24; // Convert to game milliseconds (24x speed)
+    const durationMs = ((baseDays * CONSTANTS.DAY_MS) / speed) * 24; // Convert real time to game time
     const deployment = {
         id: getCurrentGameTime(),
         type: gameState.state.pendingDeployType,
@@ -575,9 +716,37 @@ export function resolveMission(gameState, deployment) {
                     
                     log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). ${targetName}'s land: ${gameState.state.npcState[target].maxLand}, Your land: ${gameState.state.maxLand}`, "text-green-400 font-bold");
                 } else {
-                    // Multiplayer player target (not yet implemented)
-                    gameState.state.maxLand += actualLandGained;
-                    log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). Max land: ${gameState.state.maxLand}`, "text-green-400 font-bold");
+                    const targetUsername = extractPlayerUsername(target);
+
+                    executePlayerConquest(targetUsername, actualLandGained)
+                        .then(result => {
+                            if (!result.success) {
+                                log(`Conquest battle won vs ${targetName}, but land transfer failed: ${result.error}`, "text-yellow-400 font-bold");
+                                showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
+                                return;
+                            }
+
+                            const gainedLand = result.landTransferred || 0;
+                            gameState.state.maxLand = Number.isFinite(result.attackerNewMaxLand)
+                                ? result.attackerNewMaxLand
+                                : (gameState.state.maxLand + gainedLand);
+
+                            if (gameState.state.conquestPlayerTargets?.[targetUsername]) {
+                                gameState.state.conquestPlayerTargets[targetUsername].maxLand = result.targetNewMaxLand;
+                            }
+
+                            const destroyedCount = (result.buildingsDestroyed || []).reduce((sum, item) => sum + (item.count || 0), 0);
+                            const buildingNote = destroyedCount > 0 ? ` ${targetName} lost ${destroyedCount} buildings.` : '';
+                            log(`Conquest Victory! Conquered ${gainedLand} land from ${targetName} (${casualtyPercent}% casualties). Your land: ${gameState.state.maxLand}.${buildingNote}`, "text-green-400 font-bold");
+                            showConquestResult(gameState, true, gainedLand, casualtiesCount, playerPower, enemyPower);
+                        })
+                        .catch(error => {
+                            console.error('PvP conquest transfer failed:', error);
+                            log(`Conquest battle won vs ${targetName}, but land transfer failed due to server error.`, "text-yellow-400 font-bold");
+                            showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
+                        });
+
+                    return;
                 }
             }
             

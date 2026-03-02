@@ -56,8 +56,12 @@ export function createGameState() {
                 half_shard: 0
             },
             rivals: {
-                // Track suspicion and counter intel on each rival
-                // Structure: { rivalKey: { suspicion: 0, suspicionLevel: 'unknown', counterIntel: 0 } }
+                // Track suspicion and intel on each NPC rival
+                // Structure: { rivalKey: { suspicion: 0, suspicionLevel: 'unknown', intel: 0 } }
+            },
+            playerRivals: {
+                // Track suspicion and intel on each player rival
+                // Structure: { username: { suspicion: 0, suspicionLevel: 'unknown', intel: 0 } }
             },
             reports: [],
             messages: [],

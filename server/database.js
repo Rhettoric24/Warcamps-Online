@@ -167,10 +167,45 @@ async function getPlayerById(playerId) {
 }
 
 /**
- * Update player game state
+ * Update player game state with server-authoritative land/buildings
+ * This prevents PvP conquest mutations from being overwritten by client saves
  */
 async function updatePlayerState(playerId, gameState) {
   try {
+    // Fetch current maxLand and buildings from server as source of truth
+    const currentPlayer = await pool.query(
+      `SELECT game_data FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    let serverMaxLand = 25;
+    let serverBuildings = {
+      market: 0,
+      training_camp: 0,
+      monastery: 0,
+      soulcaster: 0,
+      shelter: 0,
+      spy_network: 0,
+      research_library: 0,
+      stormshelter: 0,
+      whisper_tower: 0
+    };
+
+    if (currentPlayer.rows.length > 0 && currentPlayer.rows[0].game_data) {
+      const serverState = currentPlayer.rows[0].game_data;
+      if (Number.isFinite(serverState.maxLand)) {
+        serverMaxLand = serverState.maxLand;
+      }
+      if (serverState.buildings && typeof serverState.buildings === 'object') {
+        serverBuildings = { ...serverState.buildings };
+      }
+    }
+
+    // Preserve server-authoritative land/buildings; override client values
+    const mergedGameState = { ...gameState };
+    mergedGameState.maxLand = serverMaxLand;
+    mergedGameState.buildings = { ...serverBuildings };
+
     await pool.query(
       `UPDATE players SET 
         spheres = $1,
@@ -208,18 +243,18 @@ async function updatePlayerState(playerId, gameState) {
         gameState.military?.noble || 0,
         gameState.military?.spy || 0,
         gameState.military?.ghostblood || 0,
-        gameState.buildings?.market || 0,
-        gameState.buildings?.training_camp || 0,
-        gameState.buildings?.monastery || 0,
-        gameState.buildings?.soulcaster || 0,
-        gameState.buildings?.shelter || 0,
-        gameState.buildings?.spy_network || 0,
-        gameState.buildings?.research_library || 0,
-        gameState.buildings?.stormshelter || 0,
-        gameState.buildings?.whisper_tower || 0,
+        serverBuildings.market || 0,
+        serverBuildings.training_camp || 0,
+        serverBuildings.monastery || 0,
+        serverBuildings.soulcaster || 0,
+        serverBuildings.shelter || 0,
+        serverBuildings.spy_network || 0,
+        serverBuildings.research_library || 0,
+        serverBuildings.stormshelter || 0,
+        serverBuildings.whisper_tower || 0,
         gameState.dayCount || 0,
         gameState.lastTickTime || 0,
-        JSON.stringify(gameState),
+        JSON.stringify(mergedGameState),
         playerId
       ]
     );
@@ -227,6 +262,49 @@ async function updatePlayerState(playerId, gameState) {
   } catch (error) {
     console.error('Update player state error:', error);
     return false;
+  }
+}
+
+/**
+ * Merge server-authoritative land and building data into game state
+ * Ensures PvP mutations aren't overwritten when client state loads
+ */
+async function enrichGameStateWithServerLand(gameState, playerId) {
+  try {
+    // Fetch current player state from database
+    const result = await pool.query(
+      `SELECT game_data, 
+              buildings_market, buildings_training_camp, buildings_monastery,
+              buildings_soulcaster, buildings_shelter, buildings_spy_network,
+              buildings_research_library, buildings_stormshelter, buildings_whisper_tower
+       FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) return gameState;
+
+    const serverData = result.rows[0];
+    const serverGameData = serverData.game_data || {};
+    
+    // Ensure server-authoritative maxLand is present
+    gameState.maxLand = serverGameData.maxLand || gameState.maxLand || 0;
+    
+    // Ensure server-authoritative buildings are present
+    gameState.buildings = gameState.buildings || {};
+    gameState.buildings.market = serverData.buildings_market || 0;
+    gameState.buildings.training_camp = serverData.buildings_training_camp || 0;
+    gameState.buildings.monastery = serverData.buildings_monastery || 0;
+    gameState.buildings.soulcaster = serverData.buildings_soulcaster || 0;
+    gameState.buildings.shelter = serverData.buildings_shelter || 0;
+    gameState.buildings.spy_network = serverData.buildings_spy_network || 0;
+    gameState.buildings.research_library = serverData.buildings_research_library || 0;
+    gameState.buildings.stormshelter = serverData.buildings_stormshelter || 0;
+    gameState.buildings.whisper_tower = serverData.buildings_whisper_tower || 0;
+
+    return gameState;
+  } catch (error) {
+    console.error('Enrich game state with server land error:', error);
+    return gameState; // Return unmodified state on error
   }
 }
 
@@ -256,6 +334,13 @@ async function searchPlayers(options = {}) {
         buildings_market,
         buildings_training_camp,
         buildings_shelter,
+        buildings_monastery,
+        buildings_soulcaster,
+        buildings_spy_network,
+        buildings_research_library,
+        buildings_stormshelter,
+        buildings_whisper_tower,
+        game_data,
         day_count,
         created_at
       FROM players
@@ -339,6 +424,250 @@ async function getRankings(metric = 'spheres', limit = 20) {
 }
 
 /**
+ * Sabotage: Deduct resources from target player
+ */
+async function sabotagePlayer(targetUsername, resourceType, amount) {
+  try {
+    let updateQuery;
+    if (resourceType === 'spheres') {
+      updateQuery = `UPDATE players 
+                     SET spheres = GREATEST(0, spheres - $1),
+                         last_save_time = CURRENT_TIMESTAMP
+                     WHERE username = $2
+                     RETURNING spheres`;
+    } else if (resourceType === 'gemhearts') {
+      updateQuery = `UPDATE players 
+                     SET gemhearts = GREATEST(0, gemhearts - $1),
+                         last_save_time = CURRENT_TIMESTAMP
+                     WHERE username = $2
+                     RETURNING gemhearts`;
+    } else {
+      return { success: false, message: 'Invalid resource type' };
+    }
+
+    const result = await pool.query(updateQuery, [amount, targetUsername]);
+    
+    if (result.rows.length === 0) {
+      return { success: false, message: 'Target player not found' };
+    }
+
+    return { 
+      success: true, 
+      message: `Successfully sabotaged ${targetUsername}`,
+      remaining: result.rows[0][resourceType]
+    };
+  } catch (error) {
+    console.error('Error sabotaging player:', error);
+    return { success: false, message: 'Database error during sabotage' };
+  }
+}
+
+const BUILDING_LAND_COSTS = {
+  market: 1,
+  training_camp: 1,
+  shelter: 1,
+  soulcaster: 2,
+  stormshelter: 2,
+  monastery: 3,
+  research_library: 3,
+  whisper_tower: 3,
+  spy_network: 2
+};
+
+function normalizeGameStateFromRow(row) {
+  const gameState = (row.game_data && typeof row.game_data === 'object') ? { ...row.game_data } : {};
+  const buildings = {
+    market: gameState.buildings?.market ?? row.buildings_market ?? 0,
+    training_camp: gameState.buildings?.training_camp ?? row.buildings_training_camp ?? 0,
+    shelter: gameState.buildings?.shelter ?? row.buildings_shelter ?? 0,
+    monastery: gameState.buildings?.monastery ?? row.buildings_monastery ?? 0,
+    soulcaster: gameState.buildings?.soulcaster ?? row.buildings_soulcaster ?? 0,
+    spy_network: gameState.buildings?.spy_network ?? row.buildings_spy_network ?? 0,
+    research_library: gameState.buildings?.research_library ?? row.buildings_research_library ?? 0,
+    stormshelter: gameState.buildings?.stormshelter ?? row.buildings_stormshelter ?? 0,
+    whisper_tower: gameState.buildings?.whisper_tower ?? row.buildings_whisper_tower ?? 0
+  };
+
+  gameState.buildings = buildings;
+  gameState.maxLand = Number.isFinite(gameState.maxLand) ? gameState.maxLand : 25;
+  return gameState;
+}
+
+function calculateLandUsed(buildings) {
+  return Object.entries(BUILDING_LAND_COSTS).reduce((total, [building, landCost]) => {
+    return total + ((buildings[building] || 0) * landCost);
+  }, 0);
+}
+
+function trimBuildingsToMaxLand(buildings, targetMaxLand) {
+  const destroyedCounts = {};
+  const updated = { ...buildings };
+
+  const trimOrder = [
+    ['market', 'soulcaster'],
+    ['stormshelter'],
+    ['monastery', 'training_camp'],
+    ['research_library'],
+    ['whisper_tower'],
+    ['spy_network'],
+    ['shelter']
+  ];
+
+  let usedLand = calculateLandUsed(updated);
+  if (usedLand <= targetMaxLand) {
+    return { updatedBuildings: updated, buildingsDestroyed: [] };
+  }
+
+  for (const tier of trimOrder) {
+    while (usedLand > targetMaxLand) {
+      let removedInPass = false;
+      const tierOrder = [...tier].sort(() => Math.random() - 0.5);
+
+      for (const building of tierOrder) {
+        while ((updated[building] || 0) > 0 && usedLand > targetMaxLand) {
+          updated[building] -= 1;
+          usedLand -= (BUILDING_LAND_COSTS[building] || 0);
+          destroyedCounts[building] = (destroyedCounts[building] || 0) + 1;
+          removedInPass = true;
+        }
+      }
+
+      if (!removedInPass) break;
+    }
+
+    if (usedLand <= targetMaxLand) break;
+  }
+
+  const buildingsDestroyed = Object.entries(destroyedCounts).map(([building, count]) => ({ building, count }));
+  return { updatedBuildings: updated, buildingsDestroyed };
+}
+
+async function transferConquestLand(attackerUsername, targetUsername, requestedLand) {
+  const transferAmount = parseInt(requestedLand, 10);
+  if (!Number.isInteger(transferAmount) || transferAmount <= 0) {
+    return { success: false, message: 'Requested land must be a positive integer' };
+  }
+
+  if (attackerUsername === targetUsername) {
+    return { success: false, message: 'Cannot conquer land from yourself' };
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const lockedPlayers = await client.query(
+      `SELECT
+         id,
+         username,
+         game_data,
+         buildings_market,
+         buildings_training_camp,
+         buildings_monastery,
+         buildings_soulcaster,
+         buildings_shelter,
+         buildings_spy_network,
+         buildings_research_library,
+         buildings_stormshelter,
+         buildings_whisper_tower
+       FROM players
+       WHERE username = $1 OR username = $2
+       FOR UPDATE`,
+      [attackerUsername, targetUsername]
+    );
+
+    if (lockedPlayers.rows.length !== 2) {
+      await client.query('ROLLBACK');
+      return { success: false, message: 'Attacker or target not found' };
+    }
+
+    const attackerRow = lockedPlayers.rows.find(p => p.username === attackerUsername);
+    const targetRow = lockedPlayers.rows.find(p => p.username === targetUsername);
+
+    if (!attackerRow || !targetRow) {
+      await client.query('ROLLBACK');
+      return { success: false, message: 'Attacker or target not found' };
+    }
+
+    const attackerState = normalizeGameStateFromRow(attackerRow);
+    const targetState = normalizeGameStateFromRow(targetRow);
+
+    const targetMaxLand = Math.max(0, Math.floor(targetState.maxLand || 0));
+    const actualLandTransferred = Math.min(transferAmount, targetMaxLand);
+
+    if (actualLandTransferred <= 0) {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        message: `${targetUsername} has no land left to conquer`,
+        actualLandTransferred: 0
+      };
+    }
+
+    const newTargetMaxLand = targetMaxLand - actualLandTransferred;
+    const { updatedBuildings, buildingsDestroyed } = trimBuildingsToMaxLand(targetState.buildings, newTargetMaxLand);
+
+    targetState.maxLand = newTargetMaxLand;
+    targetState.buildings = updatedBuildings;
+
+    attackerState.maxLand = Math.max(0, Math.floor(attackerState.maxLand || 0) + actualLandTransferred);
+
+    await client.query(
+      `UPDATE players
+       SET game_data = $1,
+           last_save_time = CURRENT_TIMESTAMP
+       WHERE username = $2`,
+      [JSON.stringify(attackerState), attackerUsername]
+    );
+
+    await client.query(
+      `UPDATE players
+       SET game_data = $1,
+           buildings_market = $2,
+           buildings_training_camp = $3,
+           buildings_monastery = $4,
+           buildings_soulcaster = $5,
+           buildings_shelter = $6,
+           buildings_spy_network = $7,
+           buildings_research_library = $8,
+           buildings_stormshelter = $9,
+           buildings_whisper_tower = $10,
+           last_save_time = CURRENT_TIMESTAMP
+       WHERE username = $11`,
+      [
+        JSON.stringify(targetState),
+        updatedBuildings.market || 0,
+        updatedBuildings.training_camp || 0,
+        updatedBuildings.monastery || 0,
+        updatedBuildings.soulcaster || 0,
+        updatedBuildings.shelter || 0,
+        updatedBuildings.spy_network || 0,
+        updatedBuildings.research_library || 0,
+        updatedBuildings.stormshelter || 0,
+        updatedBuildings.whisper_tower || 0,
+        targetUsername
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      success: true,
+      actualLandTransferred,
+      attackerNewMaxLand: attackerState.maxLand,
+      targetNewMaxLand: newTargetMaxLand,
+      buildingsDestroyed
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error transferring conquest land:', error);
+    return { success: false, message: 'Database error during conquest land transfer' };
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Close database connection
  */
 async function closePool() {
@@ -353,7 +682,10 @@ module.exports = {
   getPlayerByUsername,
   getPlayerById,
   updatePlayerState,
+  enrichGameStateWithServerLand,
   searchPlayers,
   getRankings,
+  sabotagePlayer,
+  transferConquestLand,
   closePool
 };

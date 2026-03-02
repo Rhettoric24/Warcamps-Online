@@ -573,17 +573,29 @@ export function updateConquestUI(gameState) {
 export function updateEspionageUI(gameState) {
     const targetSelect = document.getElementById('spy-target-modal') || document.getElementById('spy-target');
     const displayEl = document.getElementById('espionage-suspicion-display');
+    const selectedPlayerInput = document.getElementById('spy-selected-player');
     
-    if (!targetSelect || !displayEl) return;
+    if (!displayEl) return;
     
+    // Check if a player is selected
+    const selectedPlayer = selectedPlayerInput ? (selectedPlayerInput.value || '').trim() : '';
+    if (selectedPlayer && gameState.state.playerRivals && gameState.state.playerRivals[selectedPlayer]) {
+        const playerRival = gameState.state.playerRivals[selectedPlayer];
+        const daysSinceSpy = playerRival.daysSinceLastSpy ?? 0;
+        displayEl.textContent = `Suspicion: ${playerRival.suspicion}/100 (${playerRival.suspicionLevel}) | Intel: ${playerRival.intel} | Days Since Spy: ${daysSinceSpy}`;
+        return;
+    }
+    
+    // Otherwise check NPC target
+    if (!targetSelect) return;
     const targetKey = targetSelect.value;
     const rival = gameState.state.rivals[targetKey];
     
     if (rival) {
         const daysSinceSpy = rival.daysSinceLastSpy ?? 0;
-        displayEl.textContent = `Suspicion: ${rival.suspicion}/100 (${rival.suspicionLevel}) | Counter Intel: ${rival.counterIntel} | Days Since Spy: ${daysSinceSpy}`;
+        displayEl.textContent = `Suspicion: ${rival.suspicion}/100 (${rival.suspicionLevel}) | Intel: ${rival.intel} | Days Since Spy: ${daysSinceSpy}`;
     } else {
-        displayEl.textContent = `Suspicion: 0/100 (unknown) | Counter Intel: 0 | Days Since Spy: 0`;
+        displayEl.textContent = `Suspicion: 0/100 (unknown) | Intel: 0 | Days Since Spy: 0`;
     }
 }
 
@@ -1000,6 +1012,81 @@ export function updateMessagesList(gameState) {
 // RANKINGS & PLAYER SEARCH
 // ============================================
 
+const LEADERBOARD_INTEL_STORAGE_KEY = 'warcamps_leaderboard_intel';
+
+function loadLeaderboardIntelCache() {
+    try {
+        return JSON.parse(localStorage.getItem(LEADERBOARD_INTEL_STORAGE_KEY) || '{}');
+    } catch (error) {
+        console.warn('Failed to read leaderboard intel cache:', error);
+        return {};
+    }
+}
+
+function getMetricValue(player, metric) {
+    if (metric === 'spheres') return player.spheres || 0;
+    if (metric === 'military') return player.totalMilitary || 0;
+    if (metric === 'land') return player.totalLand || 0;
+    if (metric === 'days') return player.dayCount || 0;
+    return player.rankValue || 0;
+}
+
+function applyInvestigationIntel(leaderboard, metric, snapshotGeneratedAt = 0) {
+    const intelByPlayer = loadLeaderboardIntelCache();
+
+    const merged = leaderboard.map((player) => {
+        const intel = intelByPlayer[player.username];
+        if (!intel) {
+            return {
+                ...player,
+                isFreshIntel: false,
+                intelCapturedAt: null
+            };
+        }
+
+        const metricTimestamps = intel.metricTimestamps || {};
+        const metricKey = metric === 'spheres' ? 'spheres'
+            : metric === 'military' ? 'military'
+            : metric === 'land' ? 'land'
+            : metric === 'days' ? 'days'
+            : metric;
+        const metricUpdatedAt = metricTimestamps[metricKey] || 0;
+        const isFreshIntel = metricUpdatedAt > snapshotGeneratedAt;
+        return {
+            ...player,
+            spheres: typeof intel.spheres === 'number' ? intel.spheres : player.spheres,
+            totalMilitary: typeof intel.totalMilitary === 'number' ? intel.totalMilitary : player.totalMilitary,
+            totalLand: typeof intel.totalLand === 'number' ? intel.totalLand : player.totalLand,
+            dayCount: typeof intel.dayCount === 'number' ? intel.dayCount : player.dayCount,
+            isFreshIntel,
+            intelCapturedAt: intel.capturedAt || null,
+            metricUpdatedAt
+        };
+    });
+
+    merged.sort((a, b) => {
+        const diff = getMetricValue(b, metric) - getMetricValue(a, metric);
+        if (diff !== 0) return diff;
+        return (a.username || '').localeCompare(b.username || '');
+    });
+
+    return merged;
+}
+
+function updateLeaderboardSnapshotLabel(snapshotGeneratedAt, nextSnapshotAt) {
+    const infoEl = document.getElementById('leaderboard-snapshot-info');
+    if (!infoEl) return;
+
+    if (!snapshotGeneratedAt || !nextSnapshotAt) {
+        infoEl.textContent = 'Snapshot schedule unavailable.';
+        return;
+    }
+
+    const nextUpdateText = new Date(nextSnapshotAt).toLocaleString();
+    const generatedText = new Date(snapshotGeneratedAt).toLocaleString();
+    infoEl.textContent = `Snapshot captured: ${generatedText} | Next 24h refresh: ${nextUpdateText}`;
+}
+
 export async function showRankings(metric = 'spheres') {
     // Update active button
     document.querySelectorAll('.ranking-metric-btn').forEach(btn => {
@@ -1026,13 +1113,21 @@ export async function showRankings(metric = 'spheres') {
             throw new Error('Failed to load rankings');
         }
         
+        updateLeaderboardSnapshotLabel(result.snapshotGeneratedAt, result.nextSnapshotAt);
+
+        const mergedLeaderboard = applyInvestigationIntel(
+            result.leaderboard,
+            metric,
+            result.snapshotGeneratedAt || 0
+        );
+
         const tbody = document.getElementById('rankings-table-body');
-        if (result.leaderboard.length === 0) {
+        if (mergedLeaderboard.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-slate-500">No players found</td></tr>';
             return;
         }
         
-        tbody.innerHTML = result.leaderboard.map((player, index) => {
+        tbody.innerHTML = mergedLeaderboard.map((player, index) => {
             let valueDisplay;
             switch(metric) {
                 case 'spheres':
@@ -1053,11 +1148,17 @@ export async function showRankings(metric = 'spheres') {
             
             const rank = index + 1;
             const rankColor = rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-slate-300' : rank === 3 ? 'text-orange-400' : 'text-slate-500';
+            const freshnessBadge = player.isFreshIntel
+                ? '<span class="ml-2 text-[10px] text-green-300 uppercase font-bold">LIVE INTEL</span>'
+                : '';
+            const rowClass = player.isFreshIntel
+                ? 'border-b border-slate-800 hover:bg-slate-800/50 bg-green-900/20 ring-1 ring-green-500/40 animate-pulse'
+                : 'border-b border-slate-800 hover:bg-slate-800/50';
             
             return `
-                <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+                <tr class="${rowClass}">
                     <td class="p-2 ${rankColor} font-bold">${rank}</td>
-                    <td class="p-2 text-white">${player.username}</td>
+                    <td class="p-2 text-white">${player.username}${freshnessBadge}</td>
                     <td class="p-2 text-right text-cyan-400 font-mono">${valueDisplay}</td>
                 </tr>
             `;
@@ -1065,9 +1166,18 @@ export async function showRankings(metric = 'spheres') {
         
     } catch (error) {
         console.error('Error loading rankings:', error);
+        updateLeaderboardSnapshotLabel(0, 0);
         document.getElementById('rankings-table-body').innerHTML = 
             '<tr><td colspan="3" class="text-center p-4 text-red-400">Failed to load rankings</td></tr>';
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('warcamps:leaderboard-intel-updated', () => {
+        const rankingsPanel = document.getElementById('panel-rankings');
+        if (!rankingsPanel || rankingsPanel.classList.contains('hidden')) return;
+        refreshRankings();
+    });
 }
 
 export async function searchPlayers() {
@@ -1214,6 +1324,9 @@ export function selectEspionageTarget(username) {
     document.getElementById('spy-selected-player-display').classList.remove('hidden');
     document.getElementById('spy-player-search-results').innerHTML = 
         '<p class="text-green-400 text-[10px] text-center py-2">✓ Target selected</p>';
+    
+    // Trigger UI update to show player suspicion
+    window.dispatchEvent(new CustomEvent('warcamps:update-ui'));
 }
 
 export function clearEspionageTarget() {
@@ -1221,6 +1334,9 @@ export function clearEspionageTarget() {
     document.getElementById('spy-selected-player-display').classList.add('hidden');
     document.getElementById('spy-player-search-results').innerHTML = 
         '<p class="text-slate-500 text-[10px] text-center py-2">Search for a player to target</p>';
+    
+    // Trigger UI update to reset suspicion display
+    window.dispatchEvent(new CustomEvent('warcamps:update-ui'));
 }
 
 // ============================================
