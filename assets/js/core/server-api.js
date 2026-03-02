@@ -1,7 +1,14 @@
 // Server API communication module
 // Handles all communication with the Railway backend server
 
-import { SERVER_URL } from './auth.js';
+// Detect if running locally or on production
+const SERVER_URL = (() => {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:3001';
+  }
+  return 'https://warcamps-online-production.up.railway.app';
+})();
 
 // Server time state
 let serverTimeCache = {
