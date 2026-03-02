@@ -173,6 +173,20 @@ export function getTimeUntilNextDay() {
 }
 
 /**
+ * Calculate the current game year based on dayCount
+ * Year 1 = days 0-6, Year 2 = days 7-13, etc.
+ * @returns {number} Current game year (1-based)
+ */
+export function getGameYear() {
+    if (serverTimeCache.gameState && serverTimeCache.gameState.dayCount !== undefined) {
+        const dayCount = serverTimeCache.gameState.dayCount;
+        return Math.floor(dayCount / 7) + 1;
+    }
+    // Fallback to year 1 if dayCount not available
+    return 1;
+}
+
+/**
  * Check if server is reachable
  * @returns {Promise<boolean>}
  */

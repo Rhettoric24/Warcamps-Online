@@ -752,15 +752,15 @@
                             <p id="plateau-timer" class="text-2xl font-bold text-white text-center my-4">00:30</p>
                             
                             <div id="plateau-actions" class="hidden">
-                                <p class="text-xs text-center text-slate-300 mb-2">Coalition forming. Muster your forces.</p>
-                                <button id="btn-muster" onclick="game.openDeployModal('run')" class="w-full btn-alethi py-3 rounded font-bold text-sm mb-2">
-                                    MUSTER FORCES
+                                <p class="text-xs text-center text-slate-300 mb-2">Join the coalition and earn speed bonuses based on your readiness!</p>
+                                <button id="btn-join-plateau" onclick="game.playerJoinRun()" class="w-full btn-alethi py-3 rounded font-bold text-sm mb-2">
+                                    JOIN COALITION
                                 </button>
                             </div>
 
                             <!-- LEADERBOARD (MUSTER PHASE) -->
                             <div id="muster-leaderboard" class="hidden mt-4 border-t border-slate-700 pt-2">
-                                <h4 class="text-[10px] font-bold text-slate-400 mb-1">PROJECTED SPEEDS</h4>
+                                <h4 class="text-[10px] font-bold text-slate-400 mb-1">COALITION SPEEDS (Sign-up Order)</h4>
                                 <div id="leaderboard-content" class="space-y-1"></div>
                             </div>
                         </div>

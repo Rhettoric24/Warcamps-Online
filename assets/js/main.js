@@ -21,7 +21,7 @@ import { build, buyGemheart, constructFabrial, upgradeBuilding, getEffectiveBuil
 import { startDuel, commitThrill, enterTournament, useThrillAmplifier, useHalfShard, useRegenPlate, forfeitDuel } from './arena/arena.js';
 import { spyAction, processSuspicionDecay } from './espionage/espionage.js';
 import { openDeployModal, closeDeployModal, confirmDeploy, checkDeployments, updateMissionInfo, recallMission } from './events/deployments.js';
-import { spawnEvent, simulateNPCJoin, resolveRun } from './events/plateau-runs.js';
+import { spawnEvent, simulateNPCJoin, resolveRun, playerJoinRun, updateEventUI } from './events/plateau-runs.js';
 import { checkHighstorm, updateHighstormEffects, hideHighstormNotification, showHighstormImpactModal } from './events/highstorm.js';
 import { getConquestStatus, canStartConquest } from './events/conquest.js';
 
@@ -415,30 +415,36 @@ const gameInstance = {
         const run = this.state.activeRun;
 
         if (run.phase === 'WARNING') {
-            const timeLeft = (run.warnEndTime - now) / 1000;
-            document.getElementById('plateau-timer').innerText = `WARNING: ${timeLeft.toFixed(1)}s`;
-            if (now >= run.warnEndTime) {
-                run.phase = 'OPEN';
-                run.openEndTime = now + CONSTANTS.DAY_MS;
-                document.getElementById('plateau-label').innerText = "MUSTER PHASE";
+            const timeLeft = (run.warningEndTime - now) / 1000;
+            const mins = Math.floor(timeLeft / 60);
+            const secs = Math.floor(timeLeft % 60);
+            const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+            
+            document.getElementById('plateau-timer').innerText = `⚠️ WARNING: ${timeStr}`;
+            
+            if (now >= run.warningEndTime) {
+                run.phase = 'MUSTER';
+                document.getElementById('plateau-label').innerText = "🎖️ MUSTER PHASE";
                 document.getElementById('plateau-label').className = "absolute top-0 right-0 bg-green-600 text-[10px] font-bold px-2 py-1";
                 document.getElementById('plateau-actions').classList.remove('hidden');
                 document.getElementById('muster-leaderboard').classList.remove('hidden');
+                log("⚡ Muster phase is now open! Sign up to join the coalition.", "text-green-400 font-bold");
             }
-        } else if (run.phase === 'OPEN') {
-            const timeLeft = (run.openEndTime - now) / 1000;
-            const hrs = Math.floor(timeLeft / 3600);
-            const mins = Math.floor((timeLeft % 3600) / 60);
+        } else if (run.phase === 'MUSTER') {
+            const timeLeft = (run.musterEndTime - now) / 1000;
+            const mins = Math.floor(timeLeft / 60);
             const secs = Math.floor(timeLeft % 60);
+            const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
-            let timeStr = `${secs}s`;
-            if (hrs > 0) timeStr = `${hrs}h ${mins}m`;
-            else if (mins > 0) timeStr = `${mins}m ${secs}s`;
+            document.getElementById('plateau-timer').innerText = `Departing in: ${timeStr}`;
 
-            document.getElementById('plateau-timer').innerText = `Departing: ${timeStr}`;
-
-            if (Math.random() < 0.05) simulateNPCJoin(this);
-            if (now >= run.openEndTime) {
+            // Occasionally add NPCs during muster phase
+            if (Math.random() < 0.02) {
+                simulateNPCJoin(this);
+                updateEventUI(this); // Update UI when NPC joins
+            }
+            
+            if (now >= run.musterEndTime) {
                 resolveRun(this);
             }
         }
@@ -946,7 +952,9 @@ const gameInstance = {
     setEspionageTargetType: (type) => setEspionageTargetType(type),
     searchEspionageTargets: () => searchEspionageTargets(),
     selectEspionageTarget: (username) => selectEspionageTarget(username),
-    clearEspionageTarget: () => clearEspionageTarget()
+    clearEspionageTarget: () => clearEspionageTarget(),
+    /* Plateau Run */
+    playerJoinRun: () => playerJoinRun(gameInstance)
 };
 
 // Helper functions for highstorm modal
