@@ -35,14 +35,15 @@ function calculateParticipantSpeed(bridgemen, chulls, signupIndex) {
     // Base speed: 1.0 + (bridgemen * 0.01)
     const baseSpeed = 1.0 + (bridgemen * 0.01);
     
-    // Carry bonus: chulls contribute to speed (1 chull = 0.05 speed)
-    const carryBonus = chulls * 0.05;
+    // Speed penalty from chulls: each chull reduces speed by 0.025 (2.5%)
+    // Chulls are cargo units that slow you down, not speed them up
+    const chullPenalty = chulls * -0.025;
     
     // Sign-up order bonus
     const signupBonus = getSignupOrderBonus(signupIndex);
     
     // Total speed
-    const totalSpeed = baseSpeed + carryBonus + signupBonus;
+    const totalSpeed = baseSpeed + chullPenalty + signupBonus;
     
     return totalSpeed;
 }
