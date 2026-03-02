@@ -189,6 +189,19 @@ function formatGameTime(gameMs) {
 }
 
 // ============================================
+// STATIC FILE SERVING (Frontend)
+// ============================================
+
+// Serve static files from the assets directory
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../assets')));
+
+// Serve index.html for root path
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../index.html'));
+});
+
+// ============================================
 // AUTHENTICATION ENDPOINTS
 // ============================================
 
