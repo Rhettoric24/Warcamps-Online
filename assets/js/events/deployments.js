@@ -69,7 +69,7 @@ async function refreshConquestPlayerTargets(gameState) {
     try {
         const token = localStorage.getItem('authToken');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const response = await fetch(`${SERVER_URL}/api/players?limit=15&excludeSelf=true`, { headers });
+        const response = await fetch(`${SERVER_URL}/api/players?limit=100&excludeSelf=true`, { headers });
         const result = await response.json();
         if (!response.ok || !result.success || !Array.isArray(result.players)) return;
 
