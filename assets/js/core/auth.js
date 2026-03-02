@@ -1,25 +1,33 @@
 // Authentication Module
 // Handles login, registration, and session management
 
-// SERVER_URL is determined by fetching /api/config from wherever the app is hosted
-// This allows the same code to work in development (localhost) and production (Railway, etc)
-let SERVER_URL = null;
+// Default URL strategy:
+// - localhost/127.0.0.1 => local API server
+// - anything else (e.g. GitHub Pages) => Railway API server
+let SERVER_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3001'
+    : 'https://warcamps-online-production.up.railway.app';
+
+export { SERVER_URL };
 
 export async function initializeServerUrl() {
-  if (SERVER_URL) return SERVER_URL;
-  
+    if (SERVER_URL) return SERVER_URL;
+
   try {
-    // First, try to get config from current origin
+        // If frontend and API are hosted together, prefer server-provided config
     const currentOrigin = window.location.origin;
     const response = await fetch(`${currentOrigin}/api/config`);
+        if (!response.ok) {
+            return SERVER_URL;
+        }
     const data = await response.json();
-    SERVER_URL = data.serverUrl || currentOrigin;
+        if (data && data.serverUrl) {
+            SERVER_URL = data.serverUrl;
+        }
   } catch (error) {
-    // Fallback: use current origin
-    console.warn('Failed to fetch server config, using current origin');
-    SERVER_URL = window.location.origin;
+        // Keep default strategy above (localhost or Railway)
   }
-  
+
   return SERVER_URL;
 }
 
