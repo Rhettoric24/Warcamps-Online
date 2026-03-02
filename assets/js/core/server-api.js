@@ -1,7 +1,7 @@
 // Server API communication module
 // Handles all communication with the Railway backend server
 
-const SERVER_URL = 'https://warcamps-online-production.up.railway.app';
+import { SERVER_URL } from './auth.js';
 
 // Server time state
 let serverTimeCache = {
