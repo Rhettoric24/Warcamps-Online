@@ -390,6 +390,37 @@ app.get('/api/player/:playerId/state', requireAuth, async (req, res) => {
     return res.status(403).json({ success: false, error: 'Access denied for this player state' });
   }
 
+  // Fix land desync: recalculate from actual building counts (DB columns are source of truth)
+  let gameState = player.game_data || null;
+  if (gameState && gameState.buildings) {
+    const actualBuildingCount = 
+      (player.buildings_market || 0) +
+      (player.buildings_training_camp || 0) +
+      (player.buildings_shelter || 0) +
+      (player.buildings_monastery || 0) +
+      (player.buildings_soulcaster || 0) +
+      (player.buildings_spy_network || 0) +
+      (player.buildings_research_library || 0) +
+      (player.buildings_stormshelter || 0) +
+      (player.buildings_whisper_tower || 0);
+    
+    // Correct land to match actual building count
+    gameState.land = actualBuildingCount;
+    
+    // Sync buildings from DB columns to game_data
+    gameState.buildings = {
+      market: player.buildings_market || 0,
+      training_camp: player.buildings_training_camp || 0,
+      shelter: player.buildings_shelter || 0,
+      monastery: player.buildings_monastery || 0,
+      soulcaster: player.buildings_soulcaster || 0,
+      spy_network: player.buildings_spy_network || 0,
+      research_library: player.buildings_research_library || 0,
+      stormshelter: player.buildings_stormshelter || 0,
+      whisper_tower: player.buildings_whisper_tower || 0
+    };
+  }
+
   res.json({
     success: true,
     player: {
@@ -398,7 +429,7 @@ app.get('/api/player/:playerId/state', requireAuth, async (req, res) => {
       day_count: player.day_count,
       last_save_time: player.last_save_time
     },
-    gameState: player.game_data || null
+    gameState
   });
 });
 
