@@ -1,5 +1,5 @@
 // Plateau run event system
-import { CONSTANTS, NPC_PRINCES } from '../core/constants.js';
+import { CONSTANTS, NPC_PRINCES, UNIT_STATS } from '../core/constants.js';
 import { log, triggerNotification, startTitleFlash, stopTitleFlash, flashScreen } from '../core/utils.js';
 import { getCurrentGameTime } from '../core/server-api.js';
 
@@ -29,7 +29,7 @@ function getSignupOrderBonus(signupIndex) {
 
 /**
  * Calculate speed for a participant
- * Base speed from bridgemen + carry bonus, plus sign-up order bonus
+ * Base speed from bridgemen + chull penalty, plus sign-up order bonus
  */
 function calculateParticipantSpeed(bridgemen, chulls, signupIndex) {
     // Base speed: 1.0 + (bridgemen * 0.01)
@@ -80,8 +80,8 @@ export function spawnEvent(gameState) {
     triggerNotification("Plateau Run Detected!", "A Chasmfiend has been spotted. You have 5 minutes to prepare!");
     startTitleFlash();
 
-    // NPCs join during warning phase
-    simulateNPCJoin(gameState, true);
+    // NPCs do not join during warning; they can only start joining
+    // after the initial 5 minutes of the muster phase.
     updateEventUI(gameState);
 }
 
@@ -115,13 +115,25 @@ export function playerJoinRun(gameState) {
         return false;
     }
 
-    // Calculate player power from military units
     const military = gameState.state.military;
-    const totalPower = (military.knights || 0) * 5 + 
-                       (military.crossbowmen || 0) * 4 + 
-                       (military.rangers || 0) * 3 + 
-                       (military.cavalry || 0) * 8 +
-                       (military.bridgecrews || 0) * 1;
+    const deployableUnits = ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'];
+
+    // Snapshot only units that are valid for plateau deployments
+    const militarySnapshot = {};
+    deployableUnits.forEach(unitType => {
+        militarySnapshot[unitType] = military[unitType] || 0;
+    });
+
+    // Calculate player power using UNIT_STATS (same model as other missions)
+    let totalPower = 0;
+    deployableUnits.forEach(unitType => {
+        const count = militarySnapshot[unitType] || 0;
+        totalPower += count * (UNIT_STATS[unitType]?.power || 0);
+    });
+
+    if ((militarySnapshot.shardbearers || 0) > 0) {
+        totalPower *= (UNIT_STATS.shardbearers.multiplier * militarySnapshot.shardbearers);
+    }
 
     // Sign up the player with timestamp
     const signupIndex = run.signedUpPlayers.length;
@@ -137,7 +149,7 @@ export function playerJoinRun(gameState) {
         bridgemen: bridgemen,
         chulls: chulls,
         power: totalPower,
-        military: JSON.parse(JSON.stringify(military)) // Store military snapshot for deployment
+        military: militarySnapshot // Store deployment-safe military snapshot
     });
 
     // Add to participants array
@@ -157,8 +169,17 @@ export function playerJoinRun(gameState) {
 
 export function simulateNPCJoin(gameState, force = false) {
     if (!gameState.state.activeRun) return;
+    const run = gameState.state.activeRun;
+
+    // Fairness gate: NPCs cannot join during WARNING or the first 5 minutes of MUSTER.
+    if (!force) {
+        if (run.phase !== 'MUSTER') return;
+        const npcJoinUnlockTime = run.musterStartTime + (5 * 60 * 1000);
+        if (Date.now() < npcJoinUnlockTime) return;
+    }
+
     const availableNPCs = Object.values(NPC_PRINCES).filter(n =>
-        !gameState.state.activeRun.participants.find(p => p.name === n.name)
+        !run.participants.find(p => p.name === n.name)
     );
     if (availableNPCs.length === 0) return;
 
@@ -170,7 +191,7 @@ export function simulateNPCJoin(gameState, force = false) {
     const npcSpeed = calculateParticipantSpeed(bridgemen, chulls, 999); // 999 = way back in line, no bonus
     const npcCarry = chulls * 10;
     
-    gameState.state.activeRun.participants.push({
+    run.participants.push({
         name: npc.name,
         power: npc.power,
         speed: npcSpeed,
