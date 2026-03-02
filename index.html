@@ -1641,7 +1641,10 @@
                 <div class="border-t border-slate-700 pt-4 mt-4">
                     <div class="flex gap-2 mb-2">
                         <label class="text-xs text-slate-400 self-center">To:</label>
-                        <input id="message-recipient" type="text" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-slate-300 flex-grow" placeholder="Enter player username...">
+                        <input id="message-recipient" type="text" list="player-list" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm text-slate-300 flex-grow" placeholder="Enter player username..." autocomplete="off">
+                        <datalist id="player-list">
+                            <!-- Players will be dynamically loaded here -->
+                        </datalist>
                     </div>
                     <div class="flex gap-2">
                         <input id="message-input" type="text" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 flex-grow text-sm text-slate-200" placeholder="Write your message..." maxlength="500">

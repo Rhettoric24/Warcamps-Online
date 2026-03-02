@@ -1057,6 +1057,57 @@ export function updateMessagesList(gameState) {
     loadPlayerMessages();
 }
 
+export async function loadPlayerList() {
+    const datalist = document.getElementById('player-list');
+    if (!datalist) return;
+    
+    try {
+        const token = localStorage.getItem('authToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch(`${SERVER_URL}/api/players?limit=100&excludeSelf=true`, { headers });
+        const data = await response.json();
+        
+        if (response.ok && data.success && data.players) {
+            datalist.innerHTML = data.players.map(player => 
+                `<option value="${player.username}">`
+            ).join('');
+        }
+    } catch (error) {
+        console.error('Error loading player list:', error);
+    }
+}
+
+export function openMessageToPlayer(username) {
+    // Open Spanreed modal
+    const modal = document.getElementById('spanreed-modal');
+    if (modal) {
+        modal.classList.add('open');
+    }
+    
+    // Switch to Messages tab
+    if (window.game && typeof window.game.setSpanreedTab === 'function') {
+        window.game.setSpanreedTab('messages');
+    }
+    
+    // Pre-fill the recipient
+    setTimeout(() => {
+        const recipientInput = document.getElementById('message-recipient');
+        if (recipientInput) {
+            recipientInput.value = username;
+            recipientInput.focus();
+            
+            // Focus on the message input
+            setTimeout(() => {
+                const messageInput = document.getElementById('message-input');
+                if (messageInput) {
+                    messageInput.focus();
+                }
+            }, 100);
+        }
+    }, 100);
+}
+
 // ============================================
 // RANKINGS & PLAYER SEARCH
 // ============================================
@@ -1290,6 +1341,12 @@ export async function searchPlayers() {
                         >
                             📋 Profile
                         </button>
+                        <button 
+                            onclick="event.stopPropagation(); game.openMessageToPlayer('${player.username}')" 
+                            class="bg-green-700 hover:bg-green-600 text-white text-[9px] font-bold px-2 py-1 rounded whitespace-nowrap"
+                        >
+                            💬 Message
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1517,6 +1574,12 @@ export function showLeaderboardContextMenu(event, username) {
             class="w-full text-left px-3 py-2 hover:bg-cyan-800 text-cyan-300 text-[10px] font-bold transition-colors border-t border-slate-700"
         >
             📋 View Profile
+        </button>
+        <button 
+            onclick="event.stopPropagation(); game.openMessageToPlayer('${username}'); document.getElementById('leaderboard-context-menu')?.remove();"
+            class="w-full text-left px-3 py-2 hover:bg-green-800 text-green-300 text-[10px] font-bold transition-colors border-t border-slate-700"
+        >
+            💬 Send Message
         </button>
     `;
     

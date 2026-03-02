@@ -14,7 +14,7 @@ if (DEV_MODE) {
     console.log('Dev mode is OFF. Change DEV_MODE to true in assets/js/core/constants.js');
 }
 import { log, requestNotificationPermission, updateNotificationButton, triggerNotification, flashScreen } from './core/utils.js';
-import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling } from './ui/ui-manager.js';
+import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling, openMessageToPlayer } from './ui/ui-manager.js';
 import { openModal, closeModal, updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket, closeRecapModal, closeMissionModal, openSpanreedModal, closeSpanreedModal, setSpanreedTab, openSpyPlanningModal, closeSpyPlanningModal, openOfflineRecapModal, closeOfflineRecapModal } from './ui/modal-manager.js';
 import { recruit, getArmyStats } from './military/military.js';
 import { build, buyGemheart, constructFabrial, upgradeBuilding, getEffectiveBuildingBonus } from './buildings/buildings.js';
@@ -941,6 +941,7 @@ const gameInstance = {
     targetPlayerForEspionage: (username) => targetPlayerForEspionage(username),
     showLeaderboardContextMenu: (event, username) => showLeaderboardContextMenu(event, username),
     startConquestOnPlayer: (username) => startConquestOnPlayer(username),
+    openMessageToPlayer: (username) => openMessageToPlayer(username),
     /* Espionage Target Selection */
     setEspionageTargetType: (type) => setEspionageTargetType(type),
     searchEspionageTargets: () => searchEspionageTargets(),
