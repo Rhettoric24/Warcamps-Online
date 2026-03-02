@@ -165,6 +165,7 @@ const gameInstance = {
         
         this.processOfflineTime();
         updateUI(this);
+        updateReportsList(this);
         this.clearIntervals();
         this.loopIntervalId = setInterval(() => this.loop(), CONSTANTS.UI_UPDATE_RATE);
         
@@ -899,9 +900,17 @@ const gameInstance = {
     setThrillBid: (amount) => { gameInstance.state.thrillBid = amount; },
     closeRecapModal: () => closeRecapModal(),
     closeMissionModal: (type) => closeMissionModal(type),
-    openSpanreedModal: () => openSpanreedModal(),
+    openSpanreedModal: () => {
+        openSpanreedModal();
+        updateReportsList(gameInstance);
+    },
     closeSpanreedModal: () => closeSpanreedModal(),
-    setSpanreedTab: (tab) => setSpanreedTab(tab),
+    setSpanreedTab: (tab) => {
+        setSpanreedTab(tab);
+        if (tab === 'reports') {
+            updateReportsList(gameInstance);
+        }
+    },
     openSpyPlanningModal: () => openSpyPlanningModal(),
     closeSpyPlanningModal: () => closeSpyPlanningModal(),
     closeOfflineRecapModal: () => closeOfflineRecapModal(),
