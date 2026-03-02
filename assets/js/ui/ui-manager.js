@@ -1152,11 +1152,11 @@ export async function showRankings(metric = 'spheres') {
                 ? '<span class="ml-2 text-[10px] text-green-300 uppercase font-bold">LIVE INTEL</span>'
                 : '';
             const rowClass = player.isFreshIntel
-                ? 'border-b border-slate-800 hover:bg-slate-800/50 bg-green-900/20 ring-1 ring-green-500/40 animate-pulse'
-                : 'border-b border-slate-800 hover:bg-slate-800/50';
+                ? 'border-b border-slate-800 hover:bg-slate-800/50 bg-green-900/20 ring-1 ring-green-500/40 animate-pulse cursor-pointer relative leaderboard-player-row'
+                : 'border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer relative leaderboard-player-row';
             
             return `
-                <tr class="${rowClass}">
+                <tr class="${rowClass}" data-username="${player.username}" onclick="game.showLeaderboardContextMenu(event, '${player.username}')">
                     <td class="p-2 ${rankColor} font-bold">${rank}</td>
                     <td class="p-2 text-white">${player.username}${freshnessBadge}</td>
                     <td class="p-2 text-right text-cyan-400 font-mono">${valueDisplay}</td>
@@ -1213,7 +1213,7 @@ export async function searchPlayers() {
         
         resultsDiv.innerHTML = result.players.map(player => `
             <div class="bg-slate-900/50 border border-slate-700 rounded p-2">
-                <div class="flex justify-between items-center">
+                <div class="flex justify-between items-start">
                     <div>
                         <p class="text-white text-xs font-bold">${player.username}</p>
                         <p class="text-slate-400 text-[10px]">
@@ -1222,12 +1222,26 @@ export async function searchPlayers() {
                             Day ${player.dayCount}
                         </p>
                     </div>
-                    <button 
-                        onclick="game.viewPlayerProfile('${player.username}')" 
-                        class="bg-cyan-800 hover:bg-cyan-700 text-white text-[10px] font-bold px-2 py-1 rounded"
-                    >
-                        View
-                    </button>
+                    <div class="flex flex-col gap-1">
+                        <button 
+                            onclick="event.stopPropagation(); game.targetPlayerForEspionage('${player.username}')" 
+                            class="bg-purple-700 hover:bg-purple-600 text-white text-[9px] font-bold px-2 py-1 rounded whitespace-nowrap"
+                        >
+                            🕵️ Spy
+                        </button>
+                        <button 
+                            onclick="event.stopPropagation(); game.startConquestOnPlayer('${player.username}')" 
+                            class="bg-red-700 hover:bg-red-600 text-white text-[9px] font-bold px-2 py-1 rounded whitespace-nowrap"
+                        >
+                            ⚔️ Conquer
+                        </button>
+                        <button 
+                            onclick="event.stopPropagation(); game.viewPlayerProfile('${player.username}')" 
+                            class="bg-cyan-800 hover:bg-cyan-700 text-white text-[9px] font-bold px-2 py-1 rounded whitespace-nowrap"
+                        >
+                            📋 Profile
+                        </button>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -1406,4 +1420,91 @@ export function targetPlayerForEspionage(username) {
     
     // Pre-select the player
     selectEspionageTarget(username);
+}
+
+// ============================================
+// LEADERBOARD CONTEXT MENU
+// ============================================
+
+export function showLeaderboardContextMenu(event, username) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Close any existing menu
+    const existingMenu = document.getElementById('leaderboard-context-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+    
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'leaderboard-context-menu';
+    menu.className = 'fixed bg-slate-900 border border-slate-600 rounded shadow-lg z-50 overflow-hidden';
+    menu.style.minWidth = '150px';
+    
+    // Calculate position based on click
+    const rect = event.currentTarget.getBoundingClientRect();
+    menu.style.top = (rect.top + 10) + 'px';
+    menu.style.left = (rect.left + 10) + 'px';
+    
+    menu.innerHTML = `
+        <div class="text-slate-300 text-[10px] font-bold p-2 border-b border-slate-700 bg-slate-800">
+            ${username}
+        </div>
+        <button 
+            onclick="event.stopPropagation(); game.targetPlayerForEspionage('${username}'); document.getElementById('leaderboard-context-menu')?.remove();"
+            class="w-full text-left px-3 py-2 hover:bg-purple-800 text-purple-300 text-[10px] font-bold transition-colors"
+        >
+            🕵️ Espionage
+        </button>
+        <button 
+            onclick="event.stopPropagation(); game.startConquestOnPlayer('${username}'); document.getElementById('leaderboard-context-menu')?.remove();"
+            class="w-full text-left px-3 py-2 hover:bg-red-800 text-red-300 text-[10px] font-bold transition-colors border-t border-slate-700"
+        >
+            ⚔️ Conquest
+        </button>
+        <button 
+            onclick="event.stopPropagation(); game.viewPlayerProfile('${username}'); document.getElementById('leaderboard-context-menu')?.remove();"
+            class="w-full text-left px-3 py-2 hover:bg-cyan-800 text-cyan-300 text-[10px] font-bold transition-colors border-t border-slate-700"
+        >
+            📋 View Profile
+        </button>
+    `;
+    
+    document.body.appendChild(menu);
+    
+    // Close menu when clicking elsewhere
+    const closeMenu = () => {
+        if (document.getElementById('leaderboard-context-menu')) {
+            document.getElementById('leaderboard-context-menu').remove();
+        }
+        document.removeEventListener('click', closeMenu);
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+}
+
+export function startConquestOnPlayer(username) {
+    // Close profile modal if open
+    const profileModal = document.getElementById('player-profile-modal');
+    if (profileModal) {
+        profileModal.classList.remove('open');
+    }
+    
+    // Request the game instance to open deployment modal for conquest
+    // The game instance will handle opening the modal and setting targets
+    if (window.gameInstance && typeof window.gameInstance.openDeployModal === 'function') {
+        window.gameInstance.openDeployModal('conquest');
+        
+        // After a brief delay, set the player target in the conquest dropdown
+        setTimeout(() => {
+            const targetSelect = document.getElementById('conquest-target');
+            if (targetSelect) {
+                targetSelect.value = `player:${username}`;
+                // Trigger update to refresh mission info
+                if (window.gameInstance && typeof window.gameInstance.updateMissionInfo === 'function') {
+                    window.gameInstance.updateMissionInfo();
+                }
+            }
+        }, 100);
+    }
 }
