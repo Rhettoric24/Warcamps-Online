@@ -209,6 +209,29 @@ export async function fetchGlobalFreeLandPool() {
  * Check if server is reachable
  * @returns {Promise<boolean>}
  */
+    /**
+     * Fetch recent conquest attacks received by the player
+     * @returns {Promise<Array>} List of attack records
+     */
+    export async function fetchAttacksReceived() {
+        try {
+            const { authFetch } = await import('./auth.js');
+            const response = await authFetch(`${getServerUrl()}/api/player/attacks-received`);
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+            const data = await response.json();
+            return data.attacks || [];
+        } catch (error) {
+            console.error('Failed to fetch attacks received:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Check if server is reachable
+     * @returns {Promise<boolean>}
+     */
 export async function checkServerStatus() {
     try {
         const response = await fetch(`${getServerUrl()}/api/status`, { timeout: 5000 });

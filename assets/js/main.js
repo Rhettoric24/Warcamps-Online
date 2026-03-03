@@ -1,3 +1,4 @@
+import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling, openMessageToPlayer, showConquestAttackNotification } from './ui/ui-manager.js';
 
 // Main entry point for Warcamp Simulator
 import { CONSTANTS, NPC_PRINCES, DEV_MODE, BUILDING_DATA } from './core/constants.js';
@@ -410,6 +411,21 @@ const gameInstance = {
                 module.fetchGlobalFreeLandPool().then(pool => {
                     this.state.freeLandPool = pool;
                 }).catch(err => console.error('Failed to fetch free land pool:', err));
+                    // Check for new conquest attacks
+                    module.fetchAttacksReceived().then(attacks => {
+                        if (attacks && attacks.length > 0) {
+                            const newAttacks = attacks.filter(attack => {
+                                const timestamp = new Date(attack.timestamp).getTime();
+                                return timestamp > this.state.lastAttackCheckTime;
+                            });
+                            if (newAttacks.length > 0) {
+                                const latestAttack = newAttacks[newAttacks.length - 1];
+                                showConquestAttackNotification(this, latestAttack);
+                            }
+                        }
+                        this.state.attacksReceived = attacks;
+                        this.state.lastAttackCheckTime = Date.now();
+                    }).catch(err => console.error('Failed to fetch attacks received:', err));
             });
             this.lastPlateauCheck = Date.now();
         }

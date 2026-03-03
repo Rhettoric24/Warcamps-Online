@@ -23,6 +23,79 @@ export function updateUI(gameState) {
     updateModalsUI(gameState);
     updateEspionageUI(gameState);
 }
+    /**
+     * Show a notification popup when a player is attacked via conquest
+     * @param {Object} gameState - Current game state
+     * @param {Object} attack - Attack record from server with attackerUsername, landLost, buildingsDestroyed, timestamp
+     */
+    export function showConquestAttackNotification(gameState, attack) {
+        const container = document.getElementById('modal-container');
+        if (!container) return;
+
+        const modalId = `conquest-notification-${Date.now()}`;
+        const buildingsDestroyedHtml = attack.buildingsDestroyed && attack.buildingsDestroyed.length > 0
+            ? `<div class="buildings-destroyed">
+                <strong>Buildings Destroyed:</strong>
+                <ul>
+                    ${attack.buildingsDestroyed.map(b => `<li>${b.building}: ${b.count}</li>`).join('')}
+                </ul>
+            </div>`
+            : '';
+
+        const timestamp = new Date(attack.timestamp).toLocaleString();
+
+        const notificationHtml = `
+            <div class="modal fade show d-block" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content bg-dark text-light border-danger">
+                        <div class="modal-header border-danger">
+                            <h5 class="modal-title text-danger">⚔️ You've Been Attacked!</h5>
+                            <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-danger">
+                                <strong>${attack.attackerUsername}</strong> has conquered some of your land!
+                            </div>
+                            <div class="attack-detail">
+                                <p><strong>Land Lost:</strong> <span class="text-danger">${attack.landLost}</span></p>
+                                <p><strong>Time:</strong> ${timestamp}</p>
+                                ${buildingsDestroyedHtml}
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top border-secondary">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-info" onclick="window.location.hash='#spanreed'">View Reports</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        `;
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = notificationHtml;
+        const modal = tempDiv.querySelector('.modal');
+
+        container.appendChild(modal);
+        container.appendChild(tempDiv.querySelector('.modal-backdrop'));
+
+        // Setup close button
+        const closeBtn = modal.querySelector('[data-dismiss="modal"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.remove();
+                container.querySelector('.modal-backdrop')?.remove();
+            });
+        }
+
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            modal.remove();
+            container.querySelector('.modal-backdrop')?.remove();
+        }, 10000);
+
+        console.log('🎯 Conquest attack notification displayed:', attack);
+    }
 
 function updateModalsUI(gameState) {
     // Update modal visibility and stats

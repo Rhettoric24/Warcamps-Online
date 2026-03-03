@@ -856,9 +856,30 @@ async function getConversation(playerId, otherUsername, limit = 50) {
        LEFT JOIN players p2 ON m.recipient_id = p2.id
        WHERE (m.sender_id = $1 AND m.recipient_id = $2)
           OR (m.sender_id = $2 AND m.recipient_id = $1)
-       ORDER BY m.sent_at DESC
-       LIMIT $3`,
-      [playerId, otherPlayerId, limit]
+            await client.query('COMMIT');
+
+            // Store attack record for the defender's notifications
+            const attackRecord = {
+              attackerUsername,
+              landLost: actualLandTransferred,
+              buildingsDestroyed: buildingsDestroyed,
+              timestamp: new Date().toISOString()
+            };
+
+            // Add to defender's attack history (keep last 20)
+            targetState.attacksReceived = targetState.attacksReceived || [];
+            targetState.attacksReceived.push(attackRecord);
+            if (targetState.attacksReceived.length > 20) {
+              targetState.attacksReceived.shift();
+            }
+
+            // Update target with attack record
+            await pool.query(
+              `UPDATE players SET game_data = $1 WHERE username = $2`,
+              [JSON.stringify(targetState), targetUsername]
+            );
+
+            console.log(`✅ Conquest transfer successful: ${actualLandTransferred} land to ${attackerUsername}. Notification sent to ${targetUsername}.`);
     );
     
     return { success: true, messages: result.rows, otherUsername };

@@ -84,6 +84,9 @@ export function createGameState() {
                 sebarial: { maxLand: 25 },
                 dalinar: { maxLand: 25 }
             }
+                },
+                attacksReceived: [],
+                lastAttackCheckTime: 0
         }
     };
 }

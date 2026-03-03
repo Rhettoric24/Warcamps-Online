@@ -658,8 +658,56 @@ app.get('/api/players', async (req, res) => {
     username: p.username,
     spheres: p.spheres,
     totalMilitary: (p.military_bridgecrews || 0) + (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
-    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0) + (p.buildings_monastery || 0) + (p.buildings_soulcaster || 0) + (p.buildings_spy_network || 0) + (p.buildings_research_library || 0) + (p.buildings_stormshelter || 0) + (p.buildings_whisper_tower || 0),
+    res.json({
+      success: true,
+      attackerUsername: req.auth.username,
+      targetUsername,
+      landRequested: parsedLand,
+      landTransferred: result.actualLandTransferred,
+      attackerNewMaxLand: result.attackerNewMaxLand,
+      targetNewMaxLand: result.targetNewMaxLand,
+      buildingsDestroyed: result.buildingsDestroyed || []
+    });
+  });
+
+  /**
+   * GET /api/player/attacks-received
+   * Get list of recent conquest attacks received by current player
+   */
+  app.get('/api/player/attacks-received', requireAuth, async (req, res) => {
+    try {
+      const playerId = req.auth.playerId;
+    
+      const result = await pool.query(
+        `SELECT game_data FROM players WHERE id = $1`,
+        [playerId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Player not found' });
+      }
     maxLand: p.game_data?.maxLand ?? 25,
+      const gameState = result.rows[0].game_data || {};
+      const attacks = (gameState.attacksReceived || []).reverse(); // Most recent first
+    
+      res.json({
+        success: true,
+        attacks: attacks,
+        count: attacks.length
+      });
+    } catch (error) {
+      console.error('Error fetching attacks received:', error);
+      res.status(500).json({ success: false, error: 'Server error fetching attacks' });
+    }
+  });
+
+  /**
+   * GET /api/players
+   * Search and list players (optionally exclude current user)
+   */
+  app.get('/api/players', async (req, res) => {
+
+  /**@@
     dayCount: p.day_count
   }));
 
