@@ -141,7 +141,34 @@ export function applyStateSnapshot(gameState, parsed) {
 }
 
 export function saveGameState(username, gameState) {
+    // Always save locally first (for offline play)
     if (username) {
         localStorage.setItem(`highprince_save_v18_${username}`, JSON.stringify(gameState.state));
     }
+    
+    // Also send to server to keep it in sync (fire and forget, don't block on it)
+    saveGameStateToServer(username, gameState.state);
+}
+
+/**
+ * Send game state to server for persistence
+ * This ensures multiplayer data stays consistent
+ * We don't wait for response or block on failure
+ */
+function saveGameStateToServer(username, gameState) {
+    if (!username || !gameState) return;
+    
+    // Import SERVER_URL from auth dynamically to avoid circular deps
+    import('./auth.js').then(({ SERVER_URL, authFetch }) => {
+        authFetch(`${SERVER_URL}/api/player/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ gameState })
+        }).catch(error => {
+            // Silent fail - local save already worked, server sync is best effort
+            console.debug('Game state server sync failed (local save preserved):', error);
+        });
+    });
 }

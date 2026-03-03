@@ -775,6 +775,50 @@ app.get('/api/config', (req, res) => {
 });
 
 // ============================================
+// GAME STATE PERSISTENCE
+// ============================================
+
+/**
+ * POST /api/player/save
+ * Save player game state (called from client after local changes)
+ * This ensures server-side data stays in sync with client state
+ */
+app.post('/api/player/save', requireAuth, async (req, res) => {
+  const { gameState } = req.body || {};
+
+  if (!gameState || typeof gameState !== 'object') {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing or invalid gameState'
+    });
+  }
+
+  try {
+    // Save the game state to database
+    const saved = await updatePlayerState(req.auth.playerId, gameState);
+    
+    if (!saved) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to save game state'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Game state saved successfully',
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error saving game state:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error saving game state'
+    });
+  }
+});
+
+// ============================================
 // MESSAGING ENDPOINTS
 // ============================================
 
