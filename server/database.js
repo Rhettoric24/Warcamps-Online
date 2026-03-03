@@ -695,6 +695,8 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
 
     targetState.maxLand = newTargetMaxLand;
     targetState.buildings = updatedBuildings;
+    // Recalculate land usage after trimming buildings
+    targetState.land = calculateLandUsed(updatedBuildings);
 
     attackerState.maxLand = Math.max(0, Math.floor(attackerState.maxLand || 0) + actualLandTransferred);
 

@@ -1,6 +1,18 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+const BUILDING_LAND_COSTS = {
+  market: 1,
+  soulcaster: 1,
+  training_camp: 5,
+  monastery: 5,
+  shelter: 1,
+  stormshelter: 4,
+  spy_network: 2,
+  research_library: 3,
+  whisper_tower: 5
+};
+
 async function checkLandMismatch() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -39,27 +51,32 @@ async function checkLandMismatch() {
       
       const gdBuildingTotal = Object.values(gdBuildings).reduce((sum, val) => sum + (val || 0), 0);
       
+      // Calculate correct land usage from buildings
+      const correctLandUsage = Object.entries(gdBuildings).reduce((total, [building, qty]) => {
+        return total + (qty || 0) * (BUILDING_LAND_COSTS[building] || 0);
+      }, 0);
+      
       console.log(`Player: ${player.username} (Day ${player.day_count})`);
       console.log(`  DB Columns Total: ${player.total_buildings_columns} buildings`);
       console.log(`  game_data.buildings Total: ${gdBuildingTotal} buildings`);
       console.log(`  game_data.land: ${gdLand}`);
+      console.log(`  Calculated land usage: ${correctLandUsage}`);
       console.log(`  game_data.maxLand: ${gdMaxLand}`);
-      console.log(`  Available land: ${gdMaxLand - gdLand}`);
+      console.log(`  Available land: ${gdMaxLand - correctLandUsage}`);
       
       if (player.total_buildings_columns !== gdBuildingTotal) {
         console.log(`  ⚠️  MISMATCH: DB columns (${player.total_buildings_columns}) != game_data (${gdBuildingTotal})`);
       }
       
-      if (gdLand !== gdBuildingTotal) {
-        console.log(`  ⚠️  LAND DESYNC: land=${gdLand} but buildings=${gdBuildingTotal} (diff: ${gdLand - gdBuildingTotal})`);
+      if (gdLand !== correctLandUsage) {
+        console.log(`  ⚠️  LAND DESYNC: stored land=${gdLand} but calculated=${correctLandUsage} (diff: ${gdLand - correctLandUsage})`);
       }
       
       console.log('');
     });
     
     console.log('\n=== Issue Summary ===');
-    console.log('If land > buildings: Ghost land (occupied but no buildings)');
-    console.log('If land < buildings: Buildings not counting as land (should be impossible)');
+    console.log('If stored land != calculated: Land tracking out of sync with buildings');
     console.log('If DB columns != game_data: Data corruption between save systems');
     
   } finally {

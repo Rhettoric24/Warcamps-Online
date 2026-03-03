@@ -509,20 +509,6 @@ app.get('/api/player/:playerId/state', requireAuth, async (req, res) => {
   // Fix land desync: recalculate from actual building counts (DB columns are source of truth)
   let gameState = player.game_data || null;
   if (gameState && gameState.buildings) {
-    const actualBuildingCount = 
-      (player.buildings_market || 0) +
-      (player.buildings_training_camp || 0) +
-      (player.buildings_shelter || 0) +
-      (player.buildings_monastery || 0) +
-      (player.buildings_soulcaster || 0) +
-      (player.buildings_spy_network || 0) +
-      (player.buildings_research_library || 0) +
-      (player.buildings_stormshelter || 0) +
-      (player.buildings_whisper_tower || 0);
-    
-    // Correct land to match actual building count
-    gameState.land = actualBuildingCount;
-    
     // Sync buildings from DB columns to game_data
     gameState.buildings = {
       market: player.buildings_market || 0,
@@ -535,6 +521,16 @@ app.get('/api/player/:playerId/state', requireAuth, async (req, res) => {
       stormshelter: player.buildings_stormshelter || 0,
       whisper_tower: player.buildings_whisper_tower || 0
     };
+    
+    // Recalculate land usage based on actual land costs (not just building count)
+    const BUILDING_LAND_COSTS = {
+      market: 1, soulcaster: 1, training_camp: 5, monastery: 5,
+      shelter: 1, stormshelter: 4, spy_network: 2, research_library: 3, whisper_tower: 5
+    };
+    
+    gameState.land = Object.entries(gameState.buildings).reduce((total, [building, qty]) => {
+      return total + (qty || 0) * (BUILDING_LAND_COSTS[building] || 0);
+    }, 0);
   }
 
   res.json({
@@ -1137,6 +1133,9 @@ app.post('/api/actions/build', requireAuth, async (req, res) => {
     newState.spheres = spheres - totalSphereCost;
     newState.buildings = { ...buildings };
     newState.buildings[buildingType] = (buildings[buildingType] || 0) + count;
+    
+    // Recalculate and update land usage
+    newState.land = usedLand + totalLandCost;
 
     await pool.query(
       `UPDATE players SET game_data = $1 WHERE id = $2`,
