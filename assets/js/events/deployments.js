@@ -8,7 +8,8 @@ import { resolveSpy } from '../espionage/espionage.js';
 import { addReport } from '../ui/ui-manager.js';
 import { isGravityBoostActive, isGravityBurnout } from './highstorm.js';
 import { calculateEnemyPower, calculateLandReward, calculateNPCPower, calculateLandUsed, handlePlayerLandLoss } from './conquest.js';
-import { SERVER_URL } from '../core/auth.js';
+import { SERVER_URL, authFetch } from '../core/auth.js';
+import { claimLand, applyActionResult } from '../core/actions.js';
 
 function isPlayerTarget(target) {
     return typeof target === 'string' && target.startsWith('player:');
@@ -67,9 +68,7 @@ async function refreshConquestPlayerTargets(gameState) {
     gameState.state.conquestPlayerTargets = gameState.state.conquestPlayerTargets || {};
 
     try {
-        const token = localStorage.getItem('authToken');
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const response = await fetch(`${SERVER_URL}/api/players?limit=100&excludeSelf=true`, { headers });
+        const response = await authFetch(`${SERVER_URL}/api/players?limit=100&excludeSelf=true`);
         const result = await response.json();
         if (!response.ok || !result.success || !Array.isArray(result.players)) return;
 
@@ -98,32 +97,32 @@ async function refreshConquestPlayerTargets(gameState) {
 }
 
 async function executePlayerConquest(targetUsername, landAmount) {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-        return { success: false, error: 'You must be logged in to conquer player land.' };
+    console.log(`📤 SENDING PvP CONQUEST: targetUsername=${targetUsername}, landAmount=${landAmount}`);
+
+    try {
+        const response = await authFetch(`${SERVER_URL}/api/conquest-land`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUsername, landAmount })
+        });
+
+        const result = await response.json();
+        console.log(`📥 PvP CONQUEST RESPONSE:`, result);
+        if (!response.ok || !result.success) {
+            return { success: false, error: result.error || 'Land transfer failed' };
+        }
+
+        return {
+            success: true,
+            landTransferred: result.landTransferred || 0,
+            attackerNewMaxLand: result.attackerNewMaxLand,
+            targetNewMaxLand: result.targetNewMaxLand,
+            buildingsDestroyed: result.buildingsDestroyed || []
+        };
+    } catch (error) {
+        console.error('PvP conquest error:', error);
+        return { success: false, error: error.message || 'Land transfer failed' };
     }
-
-    const response = await fetch(`${SERVER_URL}/api/conquest-land`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ targetUsername, landAmount })
-    });
-
-    const result = await response.json();
-    if (!response.ok || !result.success) {
-        return { success: false, error: result.error || 'Land transfer failed' };
-    }
-
-    return {
-        success: true,
-        landTransferred: result.landTransferred || 0,
-        attackerNewMaxLand: result.attackerNewMaxLand,
-        targetNewMaxLand: result.targetNewMaxLand,
-        buildingsDestroyed: result.buildingsDestroyed || []
-    };
 }
 
 export function openDeployModal(gameState, type) {
@@ -470,6 +469,7 @@ export async function confirmDeploy(gameState) {
         }
         
         const landReward = calculateLandReward(power, enemyPower);
+        console.log(`⚔️  CONQUEST DEPLOYMENT: target=${targetName}, playerPower=${power}, enemyPower=${enemyPower}, landReward=${landReward}`);
         
         const durationMs = CONSTANTS.DAY_MS * 24; // 1 game day = 24 hours of game time = 1 hour real time
         const deployment = {
@@ -684,8 +684,11 @@ export function resolveMission(gameState, deployment) {
         const enemyPower = deployment.enemyPower;
         let landReward = deployment.landReward;
         
+        console.log(`🏆 CONQUEST RESOLUTION: playerPower=${playerPower}, enemyPower=${enemyPower}, landReward=${landReward}, target=${deployment.target}`);
+        
         // Deterministic conquest: attacker wins only if power strictly beats defender
         const victory = playerPower > enemyPower;
+        console.log(`   Victory: ${victory}, targetName: ${deployment.targetName}`);
         
         // Safety check: ensure victory always gives at least 10 land
         if (victory && landReward < 10) {
@@ -723,17 +726,34 @@ export function resolveMission(gameState, deployment) {
             let actualLandGained = landReward;
             
             if (target === 'freeland') {
-                // Take from free land pool
-                const available = gameState.state.freeLandPool || 0;
-                actualLandGained = Math.min(landReward, available);
-                gameState.state.freeLandPool = Math.max(0, available - actualLandGained);
-                gameState.state.maxLand += actualLandGained;
-                
-                if (actualLandGained < landReward) {
-                    log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). Free land pool depleted!`, "text-green-400 font-bold");
-                } else {
-                    log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). Max land: ${gameState.state.maxLand}`, "text-green-400 font-bold");
-                }
+                // Use server-authoritative endpoint to claim from free land pool
+                return claimLand(landReward)
+                    .then(result => {
+                        if (!result.success) {
+                            const error = result.error || 'Unknown error';
+                            log(`Conquest battle won, but land claim failed: ${error}`, "text-yellow-400 font-bold");
+                            showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
+                            return;
+                        }
+
+                        const actualLandGained = result.landClaimed || 0;
+                        
+                        // Update local state with server response
+                        applyActionResult(gameState, result);
+                        
+                        if (actualLandGained < landReward) {
+                            log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). Free land pool depleted!`, "text-green-400 font-bold");
+                        } else {
+                            log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). Max land: ${gameState.state.maxLand}`, "text-green-400 font-bold");
+                        }
+                        
+                        showConquestResult(gameState, true, actualLandGained, casualtiesCount, playerPower, enemyPower);
+                    })
+                    .catch(error => {
+                        console.error('Free land claim failed:', error);
+                        log(`Conquest battle won, but land claim failed due to server error.`, "text-yellow-400 font-bold");
+                        showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
+                    });
             } else {
                 // Taking from NPC/player
                 const npc = NPC_PRINCES[target];
@@ -744,12 +764,16 @@ export function resolveMission(gameState, deployment) {
                     gameState.state.maxLand += actualLandGained;
                     
                     log(`Conquest Victory! Conquered ${actualLandGained} land from ${targetName} (${casualtyPercent}% casualties). ${targetName}'s land: ${gameState.state.npcState[target].maxLand}, Your land: ${gameState.state.maxLand}`, "text-green-400 font-bold");
+                    showConquestResult(gameState, true, actualLandGained, casualtiesCount, playerPower, enemyPower);
+                    return; // Important: return to avoid falling through to duplicate showConquestResult
                 } else {
                     const targetUsername = extractPlayerUsername(target);
+                    console.log(`🎯 PvP Conquest: target='${target}', extractedUsername='${targetUsername}', landReward=${actualLandGained}`);
 
                     // Return a promise that resolves after the PvP conquest completes
                     return executePlayerConquest(targetUsername, actualLandGained)
                         .then(result => {
+                            console.log(`✅ PvP conquest result:`, result);
                             if (!result.success) {
                                 log(`Conquest battle won vs ${targetName}, but land transfer failed: ${result.error}`, "text-yellow-400 font-bold");
                                 showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
@@ -771,14 +795,15 @@ export function resolveMission(gameState, deployment) {
                             showConquestResult(gameState, true, gainedLand, casualtiesCount, playerPower, enemyPower);
                         })
                         .catch(error => {
-                            console.error('PvP conquest transfer failed:', error);
+                            console.error('❌ PvP conquest transfer failed:', error);
                             log(`Conquest battle won vs ${targetName}, but land transfer failed due to server error.`, "text-yellow-400 font-bold");
                             showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
                         });
                 }
             }
             
-            showConquestResult(gameState, true, actualLandGained, casualtiesCount, playerPower, enemyPower);
+            // Note: All conquest branches (freeland, NPC, player) now return,
+            // so this code is never reached
         } else if (victory) {
             const targetName = deployment.targetName || 'Unknown';
             log(`Conquest Victory against ${targetName}! But power too low to hold land (${casualtyPercent}% casualties).`, "text-yellow-400 font-bold");

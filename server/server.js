@@ -10,6 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'warcamps-dev-secret-change-me';
 
+// Global game state (shared across all players)
+let globalFreeLandPool = 250; // Total free land available (50 land × 5 entities: 1 pool + 4 NPCs)
+
 if (!process.env.JWT_SECRET) {
   console.warn('⚠️ JWT_SECRET is not set. Using development fallback secret. Set JWT_SECRET in production.');
 }
@@ -567,6 +570,7 @@ app.post('/api/sabotage', requireAuth, async (req, res) => {
  */
 app.post('/api/conquest-land', requireAuth, async (req, res) => {
   const { targetUsername, landAmount } = req.body || {};
+  console.log(`📡 [/api/conquest-land] Attacker: ${req.auth.username}, Target: ${targetUsername}, Land requested: ${landAmount}`);
 
   if (!targetUsername || !landAmount) {
     return res.status(400).json({
@@ -599,6 +603,7 @@ app.post('/api/conquest-land', requireAuth, async (req, res) => {
   }
 
   const result = await transferConquestLand(req.auth.username, targetUsername, parsedLand);
+  console.log(`   Transfer result:`, result);
   if (!result.success) {
     return res.status(400).json({
       success: false,
@@ -823,9 +828,20 @@ app.post('/api/player/save', requireAuth, async (req, res) => {
 // ============================================
 
 /**
+ * GET /api/global/free-land-pool
+ * Get the current global free land pool available to all players
+ */
+app.get('/api/global/free-land-pool', (req, res) => {
+  res.json({
+    success: true,
+    freeLandPool: globalFreeLandPool
+  });
+});
+
+/**
  * POST /api/actions/claim-land
- * Atomically claim free land from pool
- * Validates player isn't over max capacity
+ * Atomically claim free land from the global pool (shared by all players)
+ * Validates pool has land available
  */
 app.post('/api/actions/claim-land', requireAuth, async (req, res) => {
   try {
@@ -846,23 +862,25 @@ app.post('/api/actions/claim-land', requireAuth, async (req, res) => {
     }
 
     const currentState = result.rows[0].game_data || {};
-    const freeLandPool = currentState.freeLandPool || 250;
     const maxLand = currentState.maxLand || 25;
     
-    const actualClaimed = Math.min(amount, Math.max(0, freeLandPool - maxLand));
+    // Use global pool (shared across all players)
+    const actualClaimed = Math.min(amount, globalFreeLandPool);
     
     if (actualClaimed <= 0) {
       return res.status(400).json({ 
         success: false, 
-        error: 'No free land available or already at capacity',
+        error: 'No free land available in the global pool',
         currentMaxLand: maxLand,
-        freeLandPool: freeLandPool
+        freeLandPool: globalFreeLandPool
       });
     }
 
-    // Update state atomically
+    // Deduct from global pool atomically
+    globalFreeLandPool -= actualClaimed;
+
+    // Update player's maxLand
     const newState = { ...currentState };
-    newState.freeLandPool = freeLandPool - actualClaimed;
     newState.maxLand = maxLand + actualClaimed;
 
     await pool.query(
@@ -870,11 +888,13 @@ app.post('/api/actions/claim-land', requireAuth, async (req, res) => {
       [JSON.stringify(newState), playerId]
     );
 
+    console.log(`✅ ${req.auth.username} claimed ${actualClaimed} land. Global pool: ${globalFreeLandPool} remaining.`);
+
     res.json({
       success: true,
       landClaimed: actualClaimed,
       newMaxLand: newState.maxLand,
-      freeLandPool: newState.freeLandPool
+      freeLandPool: globalFreeLandPool
     });
   } catch (error) {
     console.error('Error claiming land:', error);
@@ -1005,7 +1025,7 @@ app.post('/api/actions/recruit', requireAuth, async (req, res) => {
       spearmen: { cost: 30, power: 8, carry: 0 },
       archers: { cost: 50, power: 12, carry: 0, multiplier: 1.5 },
       chulls: { cost: 100, power: 25, carry: 15 },
-      shardbearers: { cost: 150, power: 40, carry: 10, multiplier: 1.2 },
+      shardbearers: { cost: 0, gemheartCost: 1, power: 40, carry: 10, multiplier: 1.2 },
       noble: { cost: 250, power: 60, carry: 0, multiplier: 2 },
       spy: { cost: 200, power: 5, carry: 30 },
       ghostblood: { cost: 500, power: 100, carry: 20, multiplier: 3 }
@@ -1015,8 +1035,6 @@ app.post('/api/actions/recruit', requireAuth, async (req, res) => {
     if (!unitInfo) {
       return res.status(400).json({ success: false, error: 'Unknown unit type' });
     }
-
-    const totalCost = unitInfo.cost * count;
 
     const result = await pool.query(
       `SELECT game_data FROM players WHERE id = $1`,
@@ -1029,8 +1047,44 @@ app.post('/api/actions/recruit', requireAuth, async (req, res) => {
 
     const currentState = result.rows[0].game_data || {};
     const spheres = currentState.spheres || 0;
+    const gemhearts = currentState.gemhearts || 0;
     const military = currentState.military || {};
 
+    // Shardbearers cost gemhearts, not spheres
+    if (unitType === 'shardbearers') {
+      const gemheartCost = count; // 1 gemheart per shardbearer
+      if (gemhearts < gemheartCost) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Not enough gemhearts',
+          needed: gemheartCost,
+          available: gemhearts
+        });
+      }
+
+      // Apply changes atomically
+      const newState = { ...currentState };
+      newState.gemhearts = gemhearts - gemheartCost;
+      newState.military = { ...military };
+      newState.military[unitType] = (military[unitType] || 0) + count;
+
+      await pool.query(
+        `UPDATE players SET game_data = $1 WHERE id = $2`,
+        [JSON.stringify(newState), playerId]
+      );
+
+      return res.json({ 
+        success: true,
+        unitType,
+        recruitedCount: count,
+        gemheartsCost: gemheartCost,
+        newGemhearts: newState.gemhearts,
+        newUnitCount: newState.military[unitType]
+      });
+    }
+
+    // All other units cost spheres
+    const totalCost = unitInfo.cost * count;
     if (spheres < totalCost) {
       return res.status(400).json({ 
         success: false, 

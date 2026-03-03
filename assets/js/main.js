@@ -402,9 +402,15 @@ const gameInstance = {
             this.state.lastTickTime = now;
         }
 
-        // Poll server for plateau runs
+        // Poll server for plateau runs and global free land pool
         if (!this.lastPlateauCheck || (Date.now() - this.lastPlateauCheck) >= 10000) {
             checkServerPlateauRun(this);
+            // Update global free land pool from server (shared by all players)
+            import('./core/server-api.js').then(module => {
+                module.fetchGlobalFreeLandPool().then(pool => {
+                    this.state.freeLandPool = pool;
+                }).catch(err => console.error('Failed to fetch free land pool:', err));
+            });
             this.lastPlateauCheck = Date.now();
         }
 

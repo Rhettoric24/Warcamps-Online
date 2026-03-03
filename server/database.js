@@ -631,6 +631,8 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
     return { success: false, message: 'Cannot conquer land from yourself' };
   }
 
+  console.log(`🗡️  [transferConquestLand] Attacker: ${attackerUsername}, Target: ${targetUsername}, RequestedLand: ${requestedLand}`);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -657,6 +659,7 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
 
     if (lockedPlayers.rows.length !== 2) {
       await client.query('ROLLBACK');
+      console.log(`❌ Players not found (found ${lockedPlayers.rows.length}/2)`);
       return { success: false, message: 'Attacker or target not found' };
     }
 
@@ -665,6 +668,7 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
 
     if (!attackerRow || !targetRow) {
       await client.query('ROLLBACK');
+      console.log(`❌ Attacker or target missing after lookup`);
       return { success: false, message: 'Attacker or target not found' };
     }
 
@@ -674,8 +678,11 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
     const targetMaxLand = Math.max(0, Math.floor(targetState.maxLand || 0));
     const actualLandTransferred = Math.min(transferAmount, targetMaxLand);
 
+    console.log(`   TargetMaxLand: ${targetMaxLand}, ActualTransferred: ${actualLandTransferred}`);
+
     if (actualLandTransferred <= 0) {
       await client.query('ROLLBACK');
+      console.log(`❌ No land available (target has 0 land or requestedLand is 0)`);
       return {
         success: false,
         message: `${targetUsername} has no land left to conquer`,
@@ -730,6 +737,7 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
 
     await client.query('COMMIT');
 
+    console.log(`✅ Conquest transfer successful: ${actualLandTransferred} land to ${attackerUsername}`);
     return {
       success: true,
       actualLandTransferred,
@@ -739,7 +747,7 @@ async function transferConquestLand(attackerUsername, targetUsername, requestedL
     };
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error transferring conquest land:', error);
+    console.error('❌ Error transferring conquest land:', error);
     return { success: false, message: 'Database error during conquest land transfer' };
   } finally {
     client.release();

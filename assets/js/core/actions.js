@@ -110,6 +110,11 @@ export function applyActionResult(gameState, actionResult) {
     gameState.state.spheres = actionResult.newSpheres;
   }
 
+  // Update gemhearts if provided
+  if (actionResult.newGemhearts !== undefined) {
+    gameState.state.gemhearts = actionResult.newGemhearts;
+  }
+
   // Update buildings if provided
   if (actionResult.newBuildings !== undefined && actionResult.buildingType) {
     if (!gameState.state.buildings) gameState.state.buildings = {};

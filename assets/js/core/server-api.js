@@ -188,6 +188,24 @@ export function getGameYear() {
 }
 
 /**
+ * Fetch global free land pool (shared by all players)
+ * @returns {Promise<number>} Current free land pool value
+ */
+export async function fetchGlobalFreeLandPool() {
+    try {
+        const response = await fetch(`${getServerUrl()}/api/global/free-land-pool`);
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+        const data = await response.json();
+        return data.freeLandPool || 0;
+    } catch (error) {
+        console.error('Failed to fetch global free land pool:', error);
+        return 0;
+    }
+}
+
+/**
  * Check if server is reachable
  * @returns {Promise<boolean>}
  */
