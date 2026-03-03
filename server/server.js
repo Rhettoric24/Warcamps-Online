@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 require('dotenv').config();
 
+const { runMigrations } = require('./migrations/runner');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'warcamps-dev-secret-change-me';
@@ -13,7 +15,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Import database
-const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand, sendPlayerMessage, getPlayerInbox, getConversation, markMessagesAsRead, getUnreadMessageCount, spawnPlateauRun, getActivePlateauRun, joinPlateauRun, resolvePlateauRun, updatePlateauRunPhase } = require('./database');
+const { pool, initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand, sendPlayerMessage, getPlayerInbox, getConversation, markMessagesAsRead, getUnreadMessageCount, spawnPlateauRun, getActivePlateauRun, joinPlateauRun, resolvePlateauRun, updatePlateauRunPhase } = require('./database');
 
 // Middleware
 app.use(cors({
@@ -1059,6 +1061,13 @@ app.listen(PORT, async () => {
   
   if (!dbReady) {
     console.error('❌ Failed to initialize database. Check your DATABASE_URL.');
+    process.exit(1);
+  }
+  
+  // Run pending database migrations
+  const migrationsOk = await runMigrations(pool);
+  if (!migrationsOk) {
+    console.error('❌ Database migrations failed.');
     process.exit(1);
   }
   
