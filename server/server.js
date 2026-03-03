@@ -13,7 +13,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Import database
-const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand, sendPlayerMessage, getPlayerInbox, getConversation, markMessagesAsRead, getUnreadMessageCount } = require('./database');
+const { initializeDatabase, registerPlayer, loginPlayer, getPlayerByUsername, getPlayerById, updatePlayerState, enrichGameStateWithServerLand, searchPlayers, getRankings, sabotagePlayer, transferConquestLand, sendPlayerMessage, getPlayerInbox, getConversation, markMessagesAsRead, getUnreadMessageCount, spawnPlateauRun, getActivePlateauRun, joinPlateauRun, resolvePlateauRun, updatePlateauRunPhase } = require('./database');
 
 // Middleware
 app.use(cors({
@@ -899,6 +899,65 @@ app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// PLATEAU RUNS
+// ============================================
+
+/**
+ * GET /api/plateau/active
+ * Get the currently active plateau run
+ */
+app.get('/api/plateau/active', async (req, res) => {
+  try {
+    const result = await getActivePlateauRun();
+    
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching active plateau run:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch active run' });
+  }
+});
+
+/**
+ * POST /api/plateau/join
+ * Join the active plateau run
+ */
+app.post('/api/plateau/join', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+    const { runId, militarySnapshot, power, speed, carry, bridgemen, chulls, signupIndex } = req.body;
+    
+    if (!runId || !militarySnapshot || power === undefined || speed === undefined || carry === undefined) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const result = await joinPlateauRun(
+      runId,
+      playerId,
+      militarySnapshot,
+      power,
+      speed,
+      carry,
+      bridgemen || 0,
+      chulls || 0,
+      signupIndex || 0
+    );
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error joining plateau run:', error);
+    res.status(500).json({ success: false, error: 'Failed to join run' });
+  }
+});
+
+// ============================================
 // ERROR HANDLING
 // ============================================
 
@@ -908,6 +967,87 @@ app.use((req, res) => {
     error: 'Route not found'
   });
 });
+
+// ============================================
+// PLATEAU RUN MANAGER
+// ============================================
+
+function calculateEnemyPower(gameYear) {
+  const year = Math.max(1, gameYear || 1);
+  const base = 300;
+  const scaled = base * Math.pow(1.15, year - 1);
+  return Math.floor(scaled);
+}
+
+let plateauRunManagerInterval = null;
+
+async function startPlateauRunManager() {
+  // Run check immediately
+  await managePlateauRuns();
+  
+  // Check every 30 seconds
+  plateauRunManagerInterval = setInterval(async () => {
+    await managePlateauRuns();
+  }, 30000);
+}
+
+async function managePlateauRuns() {
+  try {
+    const now = Date.now();
+    const result = await getActivePlateauRun();
+    
+    if (!result.success) return;
+    
+    const activeRun = result.run;
+    
+    if (activeRun) {
+      // Update phase if needed
+      if (activeRun.phase === 'WARNING' && now >= activeRun.warning_end_time) {
+        await updatePlateauRunPhase(activeRun.id, 'MUSTER');
+        console.log(`🎖️  Plateau Run #${activeRun.id}: Muster phase started`);
+      }
+      
+      // Transition from MUSTER to DEPARTED (forces embark on mission)
+      if (activeRun.phase === 'MUSTER' && now >= activeRun.muster_end_time) {
+        await updatePlateauRunPhase(activeRun.id, 'DEPARTED');
+        console.log(`🚶 Plateau Run #${activeRun.id}: Forces have departed for the plateau (1 day travel)...`);
+      }
+      
+      // Resolve run after DEPARTED phase ends (forces return home)
+      if (activeRun.phase === 'DEPARTED' && now >= activeRun.departed_end_time && !activeRun.resolved) {
+        console.log(`⚔️  Plateau Run #${activeRun.id}: Forces returning home, resolving...`);
+        const resolution = await resolvePlateauRun(activeRun.id);
+        if (resolution.success) {
+          const status = resolution.victory ? '✅ VICTORY' : '❌ DEFEAT';
+          console.log(`${status} - Plateau Run #${activeRun.id} resolved`);
+          if (resolution.gemheartWinner) {
+            console.log(`   💎 Gemheart won by: ${resolution.gemheartWinner}`);
+          }
+        }
+      }
+    } else {
+      // No active run, check if we should spawn one
+      const gameMs = getGameTime();
+      const totalDays = Math.floor(gameMs / (1000 * 60 * 60 * 24));
+      const dayOfMonth = (totalDays % 24) + 1;
+      const gameYear = Math.floor(totalDays / 168) + 1;
+      
+      // Spawn runs on days 10-22 with 20% chance every check (30 seconds)
+      // This works out to roughly ~1 run per day in the window
+      const canSpawn = dayOfMonth >= 10 && dayOfMonth <= 22;
+      
+      if (canSpawn && Math.random() < 0.01) { // ~0.6% chance per 30s = ~1.2% per minute = reasonable spawn rate
+        const enemyPower = calculateEnemyPower(gameYear);
+        const spawnResult = await spawnPlateauRun(enemyPower, gameYear);
+        if (spawnResult.success) {
+          console.log(`🏔️  Plateau Run spawned! Enemy Power: ${enemyPower}, Year: ${gameYear}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Plateau run manager error:', error);
+  }
+}
 
 // ============================================
 // SERVER STARTUP
@@ -921,6 +1061,9 @@ app.listen(PORT, async () => {
     console.error('❌ Failed to initialize database. Check your DATABASE_URL.');
     process.exit(1);
   }
+  
+  // Start plateau run manager
+  startPlateauRunManager();
   
   const nextHourBoundary = new Date();
   nextHourBoundary.setHours(nextHourBoundary.getHours() + 1);
@@ -936,5 +1079,6 @@ app.listen(PORT, async () => {
   console.log(`⚙️  Time Multiplier: ${TIME_MULTIPLIER}x`);
   console.log(`🕐 Current Game Time: Year ${currentGameTime.year}, Month ${currentGameTime.month}, Day ${currentGameTime.day}`);
   console.log(`📅 Next Day Tick: ${nextTickTime} (top of the hour)`);
-  console.log(`📊 Database: Connected and ready\n`);
+  console.log(`📊 Database: Connected and ready`);
+  console.log(`🏔️  Plateau Run Manager: Active\n`);
 });

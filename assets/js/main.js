@@ -22,7 +22,7 @@ import { build, buyGemheart, constructFabrial, upgradeBuilding, getEffectiveBuil
 import { startDuel, commitThrill, enterTournament, useThrillAmplifier, useHalfShard, useRegenPlate, forfeitDuel } from './arena/arena.js';
 import { spyAction, processSuspicionDecay } from './espionage/espionage.js';
 import { openDeployModal, closeDeployModal, confirmDeploy, checkDeployments, updateMissionInfo, recallMission } from './events/deployments.js';
-import { spawnEvent, simulateNPCJoin, resolveRun, playerJoinRun, updateEventUI } from './events/plateau-runs.js';
+import { spawnEvent, simulateNPCJoin, resolveRun, playerJoinRun, updateEventUI, checkServerPlateauRun } from './events/plateau-runs.js';
 import { checkHighstorm, updateHighstormEffects, hideHighstormNotification, showHighstormImpactModal } from './events/highstorm.js';
 import { getConquestStatus, canStartConquest } from './events/conquest.js';
 
@@ -402,6 +402,12 @@ const gameInstance = {
             this.state.lastTickTime = now;
         }
 
+        // Poll server for plateau runs
+        if (!this.lastPlateauCheck || (Date.now() - this.lastPlateauCheck) >= 10000) {
+            checkServerPlateauRun(this);
+            this.lastPlateauCheck = Date.now();
+        }
+
         this.checkPlateau();
         checkDeployments(this);
         updateUI(this);
@@ -443,14 +449,24 @@ const gameInstance = {
             const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
             document.getElementById('plateau-timer').innerText = `Departing in: ${timeStr}`;
-
-            // Occasionally add NPCs during muster phase
-            if (Math.random() < 0.02) {
-                simulateNPCJoin(this);
-                updateEventUI(this); // Update UI when NPC joins
-            }
             
             if (now >= run.musterEndTime) {
+                run.phase = 'DEPARTED';
+                document.getElementById('plateau-label').innerText = "🚶 ON MISSION";
+                document.getElementById('plateau-label').className = "absolute top-0 right-0 bg-blue-600 text-[10px] font-bold px-2 py-1";
+                document.getElementById('plateau-actions').classList.add('hidden');
+                log("🏔️ The coalition has departed for the plateau!", "text-blue-400 font-bold");
+            }
+        } else if (run.phase === 'DEPARTED') {
+            const timeLeft = (run.departedEndTime - now) / 1000;
+            const hours = Math.floor(timeLeft / 3600);
+            const mins = Math.floor((timeLeft % 3600) / 60);
+            const secs = Math.floor(timeLeft % 60);
+            const timeStr = hours > 0 ? `${hours}h ${mins}m` : mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+            document.getElementById('plateau-timer').innerText = `Returning in: ${timeStr}`;
+            
+            if (now >= run.departedEndTime) {
                 resolveRun(this);
             }
         }
@@ -680,8 +696,9 @@ const gameInstance = {
                 const dayOfMonth = (totalDays % 24) + 1;
                 const canSpawn = dayOfMonth >= 10 && dayOfMonth <= 22;
 
-                if (canSpawn && !this.state.activeRun && Math.random() < 0.2) {
-                    spawnEvent(this);
+                // Check server for active plateau run instead of spawning locally
+                if (canSpawn || this.state.activeRun) {
+                    checkServerPlateauRun(this);
                 }
 
                 if (Math.random() < 0.14) {

@@ -90,6 +90,59 @@ async function initializeDatabase() {
       ON player_messages(sender_id, recipient_id, sent_at DESC);
     `);
     
+    // Create plateau_runs table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS plateau_runs (
+        id SERIAL PRIMARY KEY,
+        phase VARCHAR(20) NOT NULL DEFAULT 'WARNING',
+        warning_start_time BIGINT NOT NULL,
+        warning_end_time BIGINT NOT NULL,
+        muster_start_time BIGINT NOT NULL,
+        muster_end_time BIGINT NOT NULL,
+        departed_start_time BIGINT,
+        departed_end_time BIGINT,
+        difficulty VARCHAR(20) DEFAULT 'Medium',
+        enemy_power INT NOT NULL,
+        game_year INT NOT NULL,
+        resolved BOOLEAN DEFAULT FALSE,
+        victory BOOLEAN DEFAULT FALSE,
+        gemheart_winner_id INT REFERENCES players(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Create plateau_participants table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS plateau_participants (
+        id SERIAL PRIMARY KEY,
+        run_id INT NOT NULL REFERENCES plateau_runs(id) ON DELETE CASCADE,
+        player_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        signup_time BIGINT NOT NULL,
+        signup_index INT NOT NULL,
+        power INT NOT NULL,
+        speed DECIMAL(10, 4) NOT NULL,
+        carry INT NOT NULL,
+        bridgemen INT DEFAULT 0,
+        chulls INT DEFAULT 0,
+        military_snapshot JSONB DEFAULT '{}',
+        loot_share INT DEFAULT 0,
+        gemheart_won BOOLEAN DEFAULT FALSE,
+        
+        UNIQUE(run_id, player_id)
+      );
+    `);
+    
+    // Create indexes for faster plateau queries
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_plateau_runs_active 
+      ON plateau_runs(resolved, muster_end_time);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_plateau_participants_run 
+      ON plateau_participants(run_id, signup_time);
+    `);
+    
     console.log('✅ Database schema initialized');
     return true;
   } catch (error) {
@@ -846,6 +899,238 @@ async function getUnreadMessageCount(playerId) {
 }
 
 /**
+ * Spawn a new plateau run
+ */
+async function spawnPlateauRun(enemyPower, gameYear) {
+  try {
+    const now = Date.now();
+    const warningDuration = 5 * 60 * 1000; // 5 minutes
+    const musterDuration = 60 * 60 * 1000; // 60 minutes
+    const departedDuration = 60 * 60 * 1000; // 1 game day = 1 hour real time (24x multiplier)
+    
+    const warningEnd = now + warningDuration;
+    const musterStart = warningEnd;
+    const musterEnd = musterStart + musterDuration;
+    const departedStart = musterEnd;
+    const departedEnd = departedStart + departedDuration;
+    
+    const result = await pool.query(
+      `INSERT INTO plateau_runs 
+       (phase, warning_start_time, warning_end_time, muster_start_time, muster_end_time, 
+        departed_start_time, departed_end_time, enemy_power, game_year)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        'WARNING',
+        now,
+        warningEnd,
+        musterStart,
+        musterEnd,
+        departedStart,
+        departedEnd,
+        enemyPower,
+        gameYear
+      ]
+    );
+    
+    return { success: true, run: result.rows[0] };
+  } catch (error) {
+    console.error('Spawn plateau run error:', error);
+    return { success: false, error: 'Failed to spawn plateau run' };
+  }
+}
+
+/**
+ * Get active plateau run
+ */
+async function getActivePlateauRun() {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM plateau_runs 
+       WHERE resolved = FALSE 
+       ORDER BY created_at DESC 
+       LIMIT 1`
+    );
+    
+    if (result.rows.length === 0) {
+      return { success: true, run: null };
+    }
+    
+    // Get participants for this run
+    const participants = await pool.query(
+      `SELECT pp.*, p.username 
+       FROM plateau_participants pp
+       JOIN players p ON pp.player_id = p.id
+       WHERE pp.run_id = $1
+       ORDER BY pp.speed DESC`,
+      [result.rows[0].id]
+    );
+    
+    return { 
+      success: true, 
+      run: result.rows[0],
+      participants: participants.rows
+    };
+  } catch (error) {
+    console.error('Get active plateau run error:', error);
+    return { success: false, error: 'Failed to get active run' };
+  }
+}
+
+/**
+ * Join plateau run
+ */
+async function joinPlateauRun(runId, playerId, militarySnapshot, power, speed, carry, bridgemen, chulls, signupIndex) {
+  try {
+    // Check if player already joined
+    const existing = await pool.query(
+      'SELECT id FROM plateau_participants WHERE run_id = $1 AND player_id = $2',
+      [runId, playerId]
+    );
+    
+    if (existing.rows.length > 0) {
+      return { success: false, error: 'Already joined this run' };
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO plateau_participants 
+       (run_id, player_id, signup_time, signup_index, power, speed, carry, bridgemen, chulls, military_snapshot)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        runId,
+        playerId,
+        Date.now(),
+        signupIndex,
+        power,
+        speed,
+        carry,
+        bridgemen,
+        chulls,
+        JSON.stringify(militarySnapshot)
+      ]
+    );
+    
+    return { success: true, participant: result.rows[0] };
+  } catch (error) {
+    console.error('Join plateau run error:', error);
+    return { success: false, error: 'Failed to join run' };
+  }
+}
+
+/**
+ * Resolve plateau run
+ */
+async function resolvePlateauRun(runId) {
+  try {
+    // Get run and all participants
+    const run = await pool.query('SELECT * FROM plateau_runs WHERE id = $1', [runId]);
+    if (run.rows.length === 0) {
+      return { success: false, error: 'Run not found' };
+    }
+    
+    const participants = await pool.query(
+      `SELECT pp.*, p.username 
+       FROM plateau_participants pp
+       JOIN players p ON pp.player_id = p.id
+       WHERE pp.run_id = $1
+       ORDER BY pp.speed DESC`,
+      [runId]
+    );
+    
+    // Calculate total allied power
+    const totalPower = participants.rows.reduce((sum, p) => sum + p.power, 0);
+    const victory = totalPower >= run.rows[0].enemy_power;
+    
+    // Determine gemheart winner (highest speed)
+    const gemheartWinner = victory && participants.rows.length > 0 ? participants.rows[0] : null;
+    
+    // Calculate loot shares
+    const totalCarry = participants.rows.reduce((sum, p) => sum + p.carry, 0);
+    
+    // Update participants with rewards
+    for (const participant of participants.rows) {
+      let lootShare = 0;
+      let gemheartWon = false;
+      
+      if (victory) {
+        if (gemheartWinner && participant.player_id === gemheartWinner.player_id) {
+          lootShare = 10000;
+          gemheartWon = true;
+        } else {
+          // Share 100,000 spheres based on carry
+          const playerShare = totalCarry > 0 ? (participant.carry / totalCarry) * 100000 : 1000;
+          lootShare = Math.floor(playerShare);
+        }
+      }
+      
+      await pool.query(
+        `UPDATE plateau_participants 
+         SET loot_share = $1, gemheart_won = $2
+         WHERE id = $3`,
+        [lootShare, gemheartWon, participant.id]
+      );
+      
+      // Award gems to winner
+      if (gemheartWon) {
+        await pool.query(
+          'UPDATE players SET gemhearts = gemhearts + 1 WHERE id = $1',
+          [participant.player_id]
+        );
+      }
+      
+      // Award spheres to all participants
+      if (lootShare > 0) {
+        await pool.query(
+          'UPDATE players SET spheres = spheres + $1 WHERE id = $2',
+          [lootShare, participant.player_id]
+        );
+      }
+    }
+    
+    // Mark run as resolved
+    await pool.query(
+      `UPDATE plateau_runs 
+       SET resolved = TRUE, victory = $1, gemheart_winner_id = $2
+       WHERE id = $3`,
+      [victory, gemheartWinner ? gemheartWinner.player_id : null, runId]
+    );
+    
+    return { 
+      success: true, 
+      victory,
+      totalPower,
+      enemyPower: run.rows[0].enemy_power,
+      gemheartWinner: gemheartWinner ? gemheartWinner.username : null,
+      participants: participants.rows.map(p => ({
+        username: p.username,
+        lootShare: p.loot_share,
+        gemheartWon: p.gemheart_won
+      }))
+    };
+  } catch (error) {
+    console.error('Resolve plateau run error:', error);
+    return { success: false, error: 'Failed to resolve run' };
+  }
+}
+
+/**
+ * Update plateau run phase
+ */
+async function updatePlateauRunPhase(runId, phase) {
+  try {
+    await pool.query(
+      'UPDATE plateau_runs SET phase = $1 WHERE id = $2',
+      [phase, runId]
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Update plateau phase error:', error);
+    return { success: false };
+  }
+}
+
+/**
  * Close database connection
  */
 async function closePool() {
@@ -870,5 +1155,10 @@ module.exports = {
   getConversation,
   markMessagesAsRead,
   getUnreadMessageCount,
+  spawnPlateauRun,
+  getActivePlateauRun,
+  joinPlateauRun,
+  resolvePlateauRun,
+  updatePlateauRunPhase,
   closePool
 };
