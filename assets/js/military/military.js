@@ -73,7 +73,7 @@ export function getSpyPower(gameState) {
     return power;
 }
 
-export function recruit(gameState, type) {
+export async function recruit(gameState, type) {
     let amount = 1;
     if (['noble', 'spy', 'ghostblood'].includes(type)) {
         const spyInput = document.getElementById('recruit-amount-spy');
@@ -90,19 +90,21 @@ export function recruit(gameState, type) {
         return;
     }
 
-    // Deduct resources
-    const resourceType = (type === 'shardbearers') ? 'gemhearts' : 'spheres';
-    if (resourceType === 'gemhearts') {
-        gameState.state.gemhearts -= validation.totalCost;
-    } else {
-        gameState.state.spheres -= validation.totalCost;
-    }
-
-    // Add units to military
-    if (!gameState.state.military[type]) gameState.state.military[type] = 0;
-    gameState.state.military[type] += amount;
+    // Server-authoritative: Call atomic recruit endpoint
+    const { recruitUnits } = await import('../core/actions.js');
+    const { applyActionResult } = await import('../core/actions.js');
     
-    log(`Recruited ${amount} ${type}.`, "text-slate-300");
+    const result = await recruitUnits(type, amount);
+    
+    if (!result.success) {
+        log(`Recruitment failed: ${result.error}`, "text-red-400");
+        return;
+    }
+    
+    // Update local state from server response
+    applyActionResult(gameState, result);
+    
+    log(`Recruited ${result.recruitedCount} ${type}.`, "text-slate-300");
 }
 
 // Calculate archer protection chance (0 casualties)

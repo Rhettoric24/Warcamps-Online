@@ -819,6 +819,253 @@ app.post('/api/player/save', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// ATOMIC ACTION ENDPOINTS (Server-Authoritative)
+// ============================================
+
+/**
+ * POST /api/actions/claim-land
+ * Atomically claim free land from pool
+ * Validates player isn't over max capacity
+ */
+app.post('/api/actions/claim-land', requireAuth, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const playerId = req.auth.playerId;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'amount must be positive' });
+    }
+
+    const result = await pool.query(
+      `SELECT game_data FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    const currentState = result.rows[0].game_data || {};
+    const freeLandPool = currentState.freeLandPool || 250;
+    const maxLand = currentState.maxLand || 25;
+    
+    const actualClaimed = Math.min(amount, Math.max(0, freeLandPool - maxLand));
+    
+    if (actualClaimed <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No free land available or already at capacity',
+        currentMaxLand: maxLand,
+        freeLandPool: freeLandPool
+      });
+    }
+
+    // Update state atomically
+    const newState = { ...currentState };
+    newState.freeLandPool = freeLandPool - actualClaimed;
+    newState.maxLand = maxLand + actualClaimed;
+
+    await pool.query(
+      `UPDATE players SET game_data = $1 WHERE id = $2`,
+      [JSON.stringify(newState), playerId]
+    );
+
+    res.json({
+      success: true,
+      landClaimed: actualClaimed,
+      newMaxLand: newState.maxLand,
+      freeLandPool: newState.freeLandPool
+    });
+  } catch (error) {
+    console.error('Error claiming land:', error);
+    res.status(500).json({ success: false, error: 'Server error claiming land' });
+  }
+});
+
+/**
+ * POST /api/actions/build
+ * Atomically construct a building
+ * Validates resources, land, and updates database
+ */
+app.post('/api/actions/build', requireAuth, async (req, res) => {
+  try {
+    const { buildingType, count = 1 } = req.body;
+    const playerId = req.auth.playerId;
+
+    if (!buildingType || count < 1) {
+      return res.status(400).json({ success: false, error: 'Invalid buildingType or count' });
+    }
+
+    // Import BUILDING_DATA to validate and get costs
+    const BUILDING_DATA = {
+      market: { cost: 100, landCost: 1 },
+      training_camp: { cost: 150, landCost: 2 },
+      monastery: { cost: 200, landCost: 2 },
+      soulcaster: { cost: 300, landCost: 3 },
+      shelter: { cost: 50, landCost: 1 },
+      spy_network: { cost: 250, landCost: 2 },
+      research_library: { cost: 400, landCost: 3 },
+      stormshelter: { cost: 500, landCost: 4 },
+      whisper_tower: { cost: 600, landCost: 5 }
+    };
+
+    const buildingInfo = BUILDING_DATA[buildingType];
+    if (!buildingInfo) {
+      return res.status(400).json({ success: false, error: 'Unknown building type' });
+    }
+
+    const totalSphereCost = buildingInfo.cost * count;
+    const totalLandCost = buildingInfo.landCost * count;
+
+    const result = await pool.query(
+      `SELECT game_data FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    const currentState = result.rows[0].game_data || {};
+    const spheres = currentState.spheres || 0;
+    const maxLand = currentState.maxLand || 25;
+    const buildings = currentState.buildings || {};
+
+    // Calculate current land usage
+    let usedLand = 0;
+    for (const [type, qty] of Object.entries(buildings)) {
+      const bInfo = BUILDING_DATA[type];
+      if (bInfo) usedLand += (qty || 0) * bInfo.landCost;
+    }
+
+    const availableLand = maxLand - usedLand;
+
+    // Validation
+    if (spheres < totalSphereCost) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Not enough spheres',
+        needed: totalSphereCost,
+        available: spheres
+      });
+    }
+
+    if (availableLand < totalLandCost) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Not enough land',
+        needed: totalLandCost,
+        available: availableLand
+      });
+    }
+
+    // Apply changes atomically
+    const newState = { ...currentState };
+    newState.spheres = spheres - totalSphereCost;
+    newState.buildings = { ...buildings };
+    newState.buildings[buildingType] = (buildings[buildingType] || 0) + count;
+
+    await pool.query(
+      `UPDATE players SET game_data = $1 WHERE id = $2`,
+      [JSON.stringify(newState), playerId]
+    );
+
+    res.json({
+      success: true,
+      buildingType,
+      builtCount: count,
+      spheresCost: totalSphereCost,
+      landCost: totalLandCost,
+      newSpheres: newState.spheres,
+      newBuildings: newState.buildings[buildingType]
+    });
+  } catch (error) {
+    console.error('Error building:', error);
+    res.status(500).json({ success: false, error: 'Server error building' });
+  }
+});
+
+/**
+ * POST /api/actions/recruit
+ * Atomically recruit military units
+ * Validates resources and updates database
+ */
+app.post('/api/actions/recruit', requireAuth, async (req, res) => {
+  try {
+    const { unitType, count = 1 } = req.body;
+    const playerId = req.auth.playerId;
+
+    if (!unitType || count < 1) {
+      return res.status(400).json({ success: false, error: 'Invalid unitType or count' });
+    }
+
+    // Import UNIT_STATS to validate and get costs
+    const UNIT_STATS = {
+      bridgecrews: { cost: 25, power: 5, carry: 0 },
+      spearmen: { cost: 30, power: 8, carry: 0 },
+      archers: { cost: 50, power: 12, carry: 0, multiplier: 1.5 },
+      chulls: { cost: 100, power: 25, carry: 15 },
+      shardbearers: { cost: 150, power: 40, carry: 10, multiplier: 1.2 },
+      noble: { cost: 250, power: 60, carry: 0, multiplier: 2 },
+      spy: { cost: 200, power: 5, carry: 30 },
+      ghostblood: { cost: 500, power: 100, carry: 20, multiplier: 3 }
+    };
+
+    const unitInfo = UNIT_STATS[unitType];
+    if (!unitInfo) {
+      return res.status(400).json({ success: false, error: 'Unknown unit type' });
+    }
+
+    const totalCost = unitInfo.cost * count;
+
+    const result = await pool.query(
+      `SELECT game_data FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    const currentState = result.rows[0].game_data || {};
+    const spheres = currentState.spheres || 0;
+    const military = currentState.military || {};
+
+    if (spheres < totalCost) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Not enough spheres',
+        needed: totalCost,
+        available: spheres
+      });
+    }
+
+    // Apply changes atomically
+    const newState = { ...currentState };
+    newState.spheres = spheres - totalCost;
+    newState.military = { ...military };
+    newState.military[unitType] = (military[unitType] || 0) + count;
+
+    await pool.query(
+      `UPDATE players SET game_data = $1 WHERE id = $2`,
+      [JSON.stringify(newState), playerId]
+    );
+
+    res.json({
+      success: true,
+      unitType,
+      recruitedCount: count,
+      spheresCost: totalCost,
+      newSpheres: newState.spheres,
+      newUnitCount: newState.military[unitType]
+    });
+  } catch (error) {
+    console.error('Error recruiting:', error);
+    res.status(500).json({ success: false, error: 'Server error recruiting' });
+  }
+});
+
+// ============================================
 // MESSAGING ENDPOINTS
 // ============================================
 

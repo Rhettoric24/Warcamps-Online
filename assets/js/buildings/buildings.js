@@ -3,6 +3,7 @@ import { BUILDING_DATA, FABRIAL_DATA } from '../core/constants.js';
 import { log } from '../core/utils.js';
 import { canBuild, canConstructFabrial, canAffordResource } from '../core/validation.js';
 import { isBlackMarketDiscountActive } from '../events/highstorm.js';
+import { buildStructure, applyActionResult } from '../core/actions.js';
 
 export function getBuildingCost(gameState, type) {
     const data = BUILDING_DATA[type];
@@ -18,7 +19,7 @@ export function getBuildingCost(gameState, type) {
     return data.baseCost;
 }
 
-export function build(gameState, type) {
+export async function build(gameState, type) {
     const data = BUILDING_DATA[type];
     
     // Get bulk amount from input
@@ -42,31 +43,26 @@ export function build(gameState, type) {
         return;
     }
     
-    // Build multiple buildings with bulk purchase
-    let built = 0;
-    for (let i = 0; i < amount; i++) {
-        // Use validation framework for each building
-        const validation = canBuild(gameState, type);
-        if (!validation.valid) {
-            if (built === 0) {
-                log(validation.reason, "text-red-400 text-xs");
-            }
-            break;
-        }
-
-        // Deduct cost and land, then add building
-        gameState.state.spheres -= validation.cost;
-        if (validation.landCost && validation.landCost > 0) {
-            gameState.state.land += validation.landCost;
-        }
-        gameState.state.buildings[type]++;
-        built++;
+    // Client-side validation for immediate feedback before server call
+    const validation = canBuild(gameState, type, amount);
+    if (!validation.valid) {
+        log(validation.reason, "text-red-400 text-xs");
+        return;
     }
     
-    if (built > 0) {
-        const msg = built === 1 ? `Constructed ${type.replace('_', ' ')}.` : `Constructed ${built} ${type.replace('_', ' ')}.`;
-        log(msg, "text-green-400 text-xs");
+    // Server-authoritative: Call atomic build endpoint
+    const result = await buildStructure(type, amount);
+    
+    if (!result.success) {
+        log(`Build failed: ${result.error}`, "text-red-400 text-xs");
+        return;
     }
+    
+    // Update local state from server response
+    applyActionResult(gameState, result);
+    
+    const msg = result.builtCount === 1 ? `Constructed ${type.replace('_', ' ')}.` : `Constructed ${result.builtCount} ${type.replace('_', ' ')}.`;
+    log(msg, "text-green-400 text-xs");
 }
 
 export function buyGemheart(gameState) {
