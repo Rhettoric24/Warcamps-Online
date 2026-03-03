@@ -1016,17 +1016,26 @@ const gameInstance = {
 // Helper functions for highstorm modal
 function openHighstormDetails() {
     const modal = document.getElementById('highstorm-details-modal');
-    if (modal) modal.classList.add('open');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.classList.add('modal-open');
+    }
 }
 
 function closeHighstormModal() {
     const modal = document.getElementById('highstorm-details-modal');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 function closeHighstormImpactModal() {
     const modal = document.getElementById('highstorm-impact-modal');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 // Make notifications clickable to open details

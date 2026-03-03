@@ -24,6 +24,7 @@ export function openModal(system) {
     closeAllModals();
     if (modals[system]) {
         modals[system].classList.add('open');
+        document.body.classList.add('modal-open');
     }
 }
 
@@ -36,26 +37,39 @@ export function closeModal(specificModal = null) {
 }
 
 export function openSpyPlanningModal() {
-    if (modals.spy_planning) modals.spy_planning.classList.add('open');
+    if (modals.spy_planning) {
+        modals.spy_planning.classList.add('open');
+        document.body.classList.add('modal-open');
+    }
 }
 
 export function closeSpyPlanningModal() {
-    if (modals.spy_planning) modals.spy_planning.classList.remove('open');
+    if (modals.spy_planning) {
+        modals.spy_planning.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 export function openOfflineRecapModal() {
     closeAllModals();
-    if (modals.offline_recap) modals.offline_recap.classList.add('open');
+    if (modals.offline_recap) {
+        modals.offline_recap.classList.add('open');
+        document.body.classList.add('modal-open');
+    }
 }
 
 export function closeOfflineRecapModal() {
-    if (modals.offline_recap) modals.offline_recap.classList.remove('open');
+    if (modals.offline_recap) {
+        modals.offline_recap.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 function closeAllModals() {
     Object.values(modals).forEach(modal => {
         if (modal) modal.classList.remove('open');
     });
+    document.body.classList.remove('modal-open');
 }
 
 export function updateModalStats(statsObj) {
@@ -189,13 +203,17 @@ export function openSpanreedModal() {
     const modal = document.getElementById('spanreed-modal');
     if (modal) {
         modal.classList.add('open');
+        document.body.classList.add('modal-open');
         setSpanreedTab('reports'); // Default to reports tab
     }
 }
 
 export function closeSpanreedModal() {
     const modal = document.getElementById('spanreed-modal');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    }
 }
 
 export function setSpanreedTab(tabName) {

@@ -71,6 +71,31 @@ input[type="number"]::-webkit-outer-spin-button {
     background-size: 1rem 1rem;
 }
 
+/* Resource Box - Fixed Positioning */
+#resource-box {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 60;
+    width: auto;
+    transition: all 0.3s ease;
+}
+
+/* When modal is open, shift resource box and make vertical */
+body.modal-open #resource-box {
+    right: 0.5rem;
+    top: 1rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 120px;
+    padding: 0.75rem 1rem;
+}
+
+body.modal-open #resource-box > div {
+    min-width: auto;
+    width: 100%;
+}
+
 /* Modal Styles */
 .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;

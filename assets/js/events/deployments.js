@@ -11,6 +11,32 @@ import { calculateEnemyPower, calculateLandReward, calculateNPCPower, calculateL
 import { SERVER_URL, authFetch } from '../core/auth.js';
 import { claimLand, applyActionResult } from '../core/actions.js';
 
+const DEPLOYMENT_UNITS = ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'];
+
+function clampDeployValue(value, max) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.min(parsed, Math.max(0, max));
+}
+
+function setDeployUnitValue(unit, value, gameState, shouldUpdate = true) {
+    const input = document.getElementById(`deploy-${unit}`);
+    const slider = document.getElementById(`deploy-${unit}-slider`);
+    if (!input) return;
+
+    const inputMax = parseInt(input.max, 10) || 0;
+    const sliderMax = slider ? (parseInt(slider.max, 10) || 0) : inputMax;
+    const max = Math.min(inputMax, sliderMax);
+    const clamped = clampDeployValue(value, max);
+
+    input.value = clamped;
+    if (slider) slider.value = clamped;
+
+    if (shouldUpdate) {
+        updateMissionInfo(gameState);
+    }
+}
+
 function isPlayerTarget(target) {
     return typeof target === 'string' && target.startsWith('player:');
 }
@@ -184,13 +210,31 @@ export function openDeployModal(gameState, type) {
     gameState.state.pendingDeployType = type;
     const avail = getAvailableTroops(gameState);
 
-    ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'].forEach(u => {
+    DEPLOYMENT_UNITS.forEach(u => {
         const total = gameState.state.military[u];
         const available = avail[u] || 0;
         document.getElementById(`avail-modal-${u}`).innerText = `${available}/${total}`;
         const input = document.getElementById(`deploy-${u}`);
+        const slider = document.getElementById(`deploy-${u}-slider`);
+        const zeroBtn = document.getElementById(`deploy-${u}-zero`);
+        const maxBtn = document.getElementById(`deploy-${u}-max`);
+        if (!input) return;
+
         input.max = available;
         input.value = 0;
+
+        if (slider) {
+            slider.max = available;
+            slider.value = 0;
+        }
+
+        if (zeroBtn) {
+            zeroBtn.onclick = () => setDeployUnitValue(u, 0, gameState);
+        }
+
+        if (maxBtn) {
+            maxBtn.onclick = () => setDeployUnitValue(u, available, gameState);
+        }
     });
 
     const typeLabel = type === 'run' ? "PLATEAU RUN FORCE" : 
@@ -200,10 +244,20 @@ export function openDeployModal(gameState, type) {
     document.getElementById('deploy-type-label').innerText = typeLabel;
     
     // Add event listeners to update mission info when inputs change
-    ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'].forEach(u => {
+    DEPLOYMENT_UNITS.forEach(u => {
         const input = document.getElementById(`deploy-${u}`);
-        input.removeEventListener('input', updateMissionInfo); // Remove old listener
-        input.addEventListener('input', () => updateMissionInfo(gameState));
+        const slider = document.getElementById(`deploy-${u}-slider`);
+        if (!input) return;
+
+        input.oninput = () => {
+            setDeployUnitValue(u, input.value, gameState);
+        };
+
+        if (slider) {
+            slider.oninput = () => {
+                setDeployUnitValue(u, slider.value, gameState);
+            };
+        }
     });
     
     // Initial update
@@ -216,8 +270,20 @@ export function updateMissionInfo(gameState) {
     const units = {};
     let totalUnits = 0;
     
-    ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'].forEach(u => {
-        const val = parseInt(document.getElementById(`deploy-${u}`).value) || 0;
+    DEPLOYMENT_UNITS.forEach(u => {
+        const input = document.getElementById(`deploy-${u}`);
+        if (!input) {
+            units[u] = 0;
+            return;
+        }
+
+        const max = parseInt(input.max, 10) || 0;
+        const val = clampDeployValue(input.value, max);
+        input.value = val;
+
+        const slider = document.getElementById(`deploy-${u}-slider`);
+        if (slider) slider.value = val;
+
         units[u] = val;
         totalUnits += val;
     });
@@ -351,8 +417,20 @@ export function closeDeployModal() {
 export async function confirmDeploy(gameState) {
     const units = {};
     let total = 0;
-    ['bridgecrews', 'spearmen', 'archers', 'shardbearers', 'chulls'].forEach(u => {
-        const val = parseInt(document.getElementById(`deploy-${u}`).value) || 0;
+    DEPLOYMENT_UNITS.forEach(u => {
+        const input = document.getElementById(`deploy-${u}`);
+        if (!input) {
+            units[u] = 0;
+            return;
+        }
+
+        const max = parseInt(input.max, 10) || 0;
+        const val = clampDeployValue(input.value, max);
+        input.value = val;
+
+        const slider = document.getElementById(`deploy-${u}-slider`);
+        if (slider) slider.value = val;
+
         units[u] = val;
         total += val;
     });
@@ -381,8 +459,12 @@ export async function confirmDeploy(gameState) {
         carry += (units[u] * s.carry);
     }
 
-    if (gameState.state.fabrials.gravity_lift > 0) {
-        speed *= (1 + (0.5 * gameState.state.fabrials.gravity_lift));
+    if (gameState.state.fabrials.gravity_lift > 0 && !isGravityBurnout(gameState)) {
+        if (isGravityBoostActive(gameState)) {
+            speed *= 3.0;
+        } else {
+            speed *= (1 + (0.5 * gameState.state.fabrials.gravity_lift));
+        }
     }
     speed = Math.max(0.1, speed);
 
@@ -471,7 +553,8 @@ export async function confirmDeploy(gameState) {
         const landReward = calculateLandReward(power, enemyPower);
         console.log(`⚔️  CONQUEST DEPLOYMENT: target=${targetName}, playerPower=${power}, enemyPower=${enemyPower}, landReward=${landReward}`);
         
-        const durationMs = CONSTANTS.DAY_MS * 24; // 1 game day = 24 hours of game time = 1 hour real time
+        const baseDays = 1;
+        const durationMs = ((baseDays * CONSTANTS.DAY_MS) / speed) * 24;
         const deployment = {
             id: getCurrentGameTime(),
             type: 'conquest',
@@ -487,7 +570,7 @@ export async function confirmDeploy(gameState) {
         
         gameState.state.deployments.push(deployment);
         const actualHours = (durationMs / 3600000).toFixed(1);
-        log(`Conquest against ${targetName} deployed! Return: ${actualHours} hrs.`, "text-cyan-400 font-bold");
+        log(`Conquest against ${targetName} deployed! Speed: ${(speed * 100).toFixed(0)}%. Return: ${actualHours} hrs.`, "text-cyan-400 font-bold");
         closeDeployModal();
         return;
     }

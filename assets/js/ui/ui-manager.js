@@ -1097,11 +1097,13 @@ export function openMissionDetails(gameState, missionIndex) {
     }
     
     modal.classList.add('open');
+    document.body.classList.add('modal-open');
 }
 
 export function closeMissionDetailsModal() {
     const modal = document.getElementById('mission-details-modal');
     if (modal) modal.classList.remove('open');
+    document.body.classList.remove('modal-open');
 }
 
 export async function sendSpanreedMessage() {
@@ -1226,6 +1228,7 @@ export function openMessageToPlayer(username) {
     const modal = document.getElementById('spanreed-modal');
     if (modal) {
         modal.classList.add('open');
+        document.body.classList.add('modal-open');
     }
     
     // Switch to Messages tab
@@ -1614,6 +1617,7 @@ export async function viewPlayerProfile(username) {
     
     // Show modal and loading state
     modal.classList.add('open');
+    document.body.classList.add('modal-open');
     loading.classList.remove('hidden');
     content.classList.add('hidden');
     error.classList.add('hidden');
@@ -1663,6 +1667,7 @@ export function targetPlayerForEspionage(username) {
     // Open spy modal and set to player targeting mode
     const spyModal = document.getElementById('spy-modal');
     spyModal.classList.add('open');
+    document.body.classList.add('modal-open');
     
     // Switch to player targeting mode
     setEspionageTargetType('player');

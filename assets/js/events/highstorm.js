@@ -556,10 +556,8 @@ export function isFabrialBurnedOut(gameState, fabrialType) {
 }
 
 /**
- * Show tiered highstorm notification system
- * Phase 1 (0-10s): Full screen flashing overlay
- * Phase 2 (10s-10m): Top banner alert with pulse
- * Phase 3 (10m-end): Small persistent banner
+ * Show highstorm notification system
+ * Shows a 3-second full screen flashing overlay when a highstorm occurs
  */
 export function showHighstormNotification(gameState) {
     const notif = document.getElementById('highstorm-notification');
@@ -587,24 +585,10 @@ export function showHighstormNotification(gameState) {
     // Show screen overlay effect
     showStormOverlay();
     
-    // Transition to Phase 2 after 10 seconds
+    // Hide notification after 3 seconds (no top bar phases)
     phase2Timeout = setTimeout(() => {
-        if (phase1) phase1.classList.add('hidden');
-        if (phase2) phase2.classList.remove('hidden');
-        
-        // Start updating time remaining
-        updateHighstormPhase2Time(gameState);
-        notificationUpdateInterval = setInterval(() => updateHighstormPhase2Time(gameState), 1000);
-        
-        // Transition to Phase 3 after 10 minutes
-        phase3Timeout = setTimeout(() => {
-            if (phase2) phase2.classList.add('hidden');
-            if (phase3) phase3.classList.remove('hidden');
-            
-            if (notificationUpdateInterval) clearInterval(notificationUpdateInterval);
-            startPhase3Updates(gameState);
-        }, 600000); // 10 minutes
-    }, 10000); // 10 seconds
+        hideHighstormNotification();
+    }, 3000); // 3 seconds
 }
 
 /**
@@ -656,6 +640,7 @@ function startPhase3Updates(gameState) {
 export function hideHighstormNotification() {
     const notif = document.getElementById('highstorm-notification');
     if (notif) notif.classList.add('hidden');
+    hideStormOverlay();
     
     // Clear all timeouts
     if (stormOverlayTimeout) clearTimeout(stormOverlayTimeout);
@@ -665,7 +650,7 @@ export function hideHighstormNotification() {
 }
 
 /**
- * Show flashing storm overlay effect (10 seconds)
+ * Show flashing storm overlay effect (3 seconds)
  */
 export function showStormOverlay() {
     // Clear any existing timeout
@@ -683,11 +668,11 @@ export function showStormOverlay() {
         }
     }
     
-    // Auto-hide after 10 seconds of real time
+    // Auto-hide after 3 seconds of real time
     stormOverlayTimeout = setTimeout(() => {
         hideStormOverlay();
         stormOverlayTimeout = null;
-    }, 10000);
+    }, 3000);
 }
 
 /**
@@ -725,6 +710,7 @@ export function showHighstormImpactModal(gameState) {
     if (effects.length === 0) {
         content.innerHTML = '<div class="text-slate-400 text-center p-4">No significant effects on your warcamp.</div>';
         modal.classList.add('open');
+        document.body.classList.add('modal-open');
         return;
     }
     
@@ -760,6 +746,7 @@ export function showHighstormImpactModal(gameState) {
     
     content.innerHTML = html;
     modal.classList.add('open');
+    document.body.classList.add('modal-open');
 }
 
 function getBuildingDisplayName(buildingKey) {
