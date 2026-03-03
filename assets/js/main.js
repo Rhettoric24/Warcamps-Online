@@ -1,5 +1,3 @@
-import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling, openMessageToPlayer, showConquestAttackNotification } from './ui/ui-manager.js';
-
 // Main entry point for Warcamp Simulator
 import { CONSTANTS, NPC_PRINCES, DEV_MODE, BUILDING_DATA } from './core/constants.js';
 import { createGameState, loadGameState, saveGameState, applyStateSnapshot } from './core/game-state.js';
@@ -16,7 +14,7 @@ if (DEV_MODE) {
     console.log('Dev mode is OFF. Change DEV_MODE to true in assets/js/core/constants.js');
 }
 import { log, requestNotificationPermission, updateNotificationButton, triggerNotification, flashScreen } from './core/utils.js';
-import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling, openMessageToPlayer } from './ui/ui-manager.js';
+import { updateUI, setTab, updateEspionageUI, addReport, updateReportsList, sendSpanreedMessage, updateMessagesList, toggleReportDetails, openMissionDetails, closeMissionDetailsModal, showRankings, searchPlayers, refreshRankings, setEspionageTargetType, searchEspionageTargets, selectEspionageTarget, clearEspionageTarget, viewPlayerProfile, targetPlayerForEspionage, showLeaderboardContextMenu, startConquestOnPlayer, startMessagePolling, stopMessagePolling, openMessageToPlayer, showConquestAttackNotification } from './ui/ui-manager.js';
 import { openModal, closeModal, updateModalStats, updateSpyNetwork, toggleTournamentCard, toggleBlackMarket, closeRecapModal, closeMissionModal, openSpanreedModal, closeSpanreedModal, setSpanreedTab, openSpyPlanningModal, closeSpyPlanningModal, openOfflineRecapModal, closeOfflineRecapModal } from './ui/modal-manager.js';
 import { recruit, getArmyStats } from './military/military.js';
 import { build, buyGemheart, constructFabrial, upgradeBuilding, getEffectiveBuildingBonus } from './buildings/buildings.js';
@@ -427,6 +425,8 @@ const gameInstance = {
                         this.state.lastAttackCheckTime = Date.now();
                     }).catch(err => console.error('Failed to fetch attacks received:', err));
             });
+            // Poll for highstorm status to detect global storms
+            checkHighstorm(this);
             this.lastPlateauCheck = Date.now();
         }
 

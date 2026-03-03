@@ -83,10 +83,9 @@ export function createGameState() {
                 vargo: { maxLand: 25 },
                 sebarial: { maxLand: 25 },
                 dalinar: { maxLand: 25 }
-            }
-                },
-                attacksReceived: [],
-                lastAttackCheckTime: 0
+            },
+            attacksReceived: [],
+            lastAttackCheckTime: 0
         }
     };
 }
@@ -95,8 +94,14 @@ export function loadGameState(username, gameState) {
     const saved = localStorage.getItem(`highprince_save_v18_${username}`);
     if (!saved) return false;
 
-    const parsed = JSON.parse(saved);
-    return applyStateSnapshot(gameState, parsed);
+    try {
+        const parsed = JSON.parse(saved);
+        return applyStateSnapshot(gameState, parsed);
+    } catch (error) {
+        console.error('Invalid local save data, resetting local save for user:', username, error);
+        localStorage.removeItem(`highprince_save_v18_${username}`);
+        return false;
+    }
 }
 
 export function applyStateSnapshot(gameState, parsed) {

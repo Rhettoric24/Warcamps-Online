@@ -206,32 +206,52 @@ export async function fetchGlobalFreeLandPool() {
 }
 
 /**
+ * Fetch recent conquest attacks received by the player
+ * @returns {Promise<Array>} List of attack records
+ */
+export async function fetchAttacksReceived() {
+    try {
+        const { authFetch } = await import('./auth.js');
+        const response = await authFetch(`${getServerUrl()}/api/player/attacks-received`);
+
+        if (response.status === 404) {
+            return [];
+        }
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.attacks || [];
+    } catch (error) {
+        console.error('Failed to fetch attacks received:', error);
+        return [];
+    }
+}
+
+/**
+ * Fetch global highstorm status (synchronized across all players)
+ * @returns {Promise<Object>} Current highstorm state from server
+ */
+export async function fetchHighstormStatus() {
+    try {
+        const response = await fetch(`${getServerUrl()}/api/highstorm/status`);
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+        const data = await response.json();
+        return data.highstorm || null;
+    } catch (error) {
+        console.error('Failed to fetch highstorm status:', error);
+        return null;
+    }
+}
+
+/**
  * Check if server is reachable
  * @returns {Promise<boolean>}
  */
-    /**
-     * Fetch recent conquest attacks received by the player
-     * @returns {Promise<Array>} List of attack records
-     */
-    export async function fetchAttacksReceived() {
-        try {
-            const { authFetch } = await import('./auth.js');
-            const response = await authFetch(`${getServerUrl()}/api/player/attacks-received`);
-            if (!response.ok) {
-                throw new Error(`Server returned ${response.status}`);
-            }
-            const data = await response.json();
-            return data.attacks || [];
-        } catch (error) {
-            console.error('Failed to fetch attacks received:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Check if server is reachable
-     * @returns {Promise<boolean>}
-     */
 export async function checkServerStatus() {
     try {
         const response = await fetch(`${getServerUrl()}/api/status`, { timeout: 5000 });

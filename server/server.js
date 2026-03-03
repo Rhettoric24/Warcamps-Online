@@ -137,6 +137,104 @@ function getAlignedServerStartTime() {
 let serverStartRealTime = getAlignedServerStartTime();
 let serverStartGameTime = GAME_EPOCH;
 
+// ============================================
+// GLOBAL HIGHSTORM STATE
+// ============================================
+
+// Global highstorm tracking (shared by all players)
+let globalHighstorm = {
+  lastStormDay: -10,
+  daysSinceStorm: 10,
+  nextStormProbability: 0,
+  active: false,
+  effectsEndDay: null,
+  triggerTime: null,
+  spyBonusActive: false,
+  spyBonusEndDay: null,
+  blackMarketDiscount: false,
+  blackMarketEndDay: null,
+  lastCheckedDay: -1
+};
+
+/**
+ * Check if a highstorm should occur (server-authoritative)
+ * Called once per game day on the server
+ */
+function checkServerHighstorm() {
+  const currentDay = Math.floor(getGameTime() / (24 * 60 * 60 * 1000));
+  
+  // Only check once per day
+  if (currentDay === globalHighstorm.lastCheckedDay) {
+    return;
+  }
+  
+  globalHighstorm.lastCheckedDay = currentDay;
+  globalHighstorm.daysSinceStorm++;
+  
+  // Calculate highstorm probability
+  if (globalHighstorm.daysSinceStorm <= 3) {
+    globalHighstorm.nextStormProbability = 0; // Cannot happen 3 days after previous storm
+  } else {
+    // Increasing probability: 5% at day 4, then +5% each day
+    globalHighstorm.nextStormProbability = Math.min(0.5, (globalHighstorm.daysSinceStorm - 3) * 0.05);
+  }
+  
+  // Roll for highstorm
+  if (Math.random() < globalHighstorm.nextStormProbability) {
+    triggerServerHighstorm(currentDay);
+  }
+  
+  // Check if storm effects have expired
+  if (globalHighstorm.active && currentDay >= globalHighstorm.effectsEndDay) {
+    globalHighstorm.active = false;
+    console.log(`⚡ Highstorm effects ended on day ${currentDay}`);
+  }
+  
+  // Check if spy bonus has expired
+  if (globalHighstorm.spyBonusActive && currentDay >= globalHighstorm.spyBonusEndDay) {
+    globalHighstorm.spyBonusActive = false;
+  }
+  
+  // Check if black market discount has expired
+  if (globalHighstorm.blackMarketDiscount && currentDay >= globalHighstorm.blackMarketEndDay) {
+    globalHighstorm.blackMarketDiscount = false;
+  }
+}
+
+/**
+ * Trigger a global highstorm event
+ */
+function triggerServerHighstorm(currentDay) {
+  console.log(`⚡⚡⚡ HIGHSTORM TRIGGERED ON DAY ${currentDay} ⚡⚡⚡`);
+  
+  globalHighstorm.lastStormDay = currentDay;
+  globalHighstorm.daysSinceStorm = 0;
+  globalHighstorm.nextStormProbability = 0;
+  globalHighstorm.active = true;
+  globalHighstorm.effectsEndDay = currentDay + 2; // Effects last 2 days
+  globalHighstorm.triggerTime = getGameTime();
+  
+  // Activate bonuses
+  globalHighstorm.spyBonusActive = true;
+  globalHighstorm.spyBonusEndDay = currentDay + 1; // 24 hours
+  globalHighstorm.blackMarketDiscount = true;
+  globalHighstorm.blackMarketEndDay = currentDay + 2; // 48 hours
+  
+  console.log(`   - Storm effects until day ${globalHighstorm.effectsEndDay}`);
+  console.log(`   - Spy bonus until day ${globalHighstorm.spyBonusEndDay}`);
+  console.log(`   - Black market discount until day ${globalHighstorm.blackMarketEndDay}`);
+}
+
+// Run highstorm check every minute
+setInterval(() => {
+  checkServerHighstorm();
+}, 60000);
+
+// Initial check on server start
+setTimeout(() => {
+  checkServerHighstorm();
+}, 5000);
+
 /**
  * Get the current game time in milliseconds since GAME_EPOCH
  * @returns {number} Game timestamp in milliseconds
@@ -658,56 +756,8 @@ app.get('/api/players', async (req, res) => {
     username: p.username,
     spheres: p.spheres,
     totalMilitary: (p.military_bridgecrews || 0) + (p.military_spearmen || 0) + (p.military_archers || 0) + (p.military_chulls || 0) + (p.military_shardbearers || 0),
-    res.json({
-      success: true,
-      attackerUsername: req.auth.username,
-      targetUsername,
-      landRequested: parsedLand,
-      landTransferred: result.actualLandTransferred,
-      attackerNewMaxLand: result.attackerNewMaxLand,
-      targetNewMaxLand: result.targetNewMaxLand,
-      buildingsDestroyed: result.buildingsDestroyed || []
-    });
-  });
-
-  /**
-   * GET /api/player/attacks-received
-   * Get list of recent conquest attacks received by current player
-   */
-  app.get('/api/player/attacks-received', requireAuth, async (req, res) => {
-    try {
-      const playerId = req.auth.playerId;
-    
-      const result = await pool.query(
-        `SELECT game_data FROM players WHERE id = $1`,
-        [playerId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'Player not found' });
-      }
+    totalLand: (p.buildings_market || 0) + (p.buildings_training_camp || 0) + (p.buildings_shelter || 0) + (p.buildings_monastery || 0) + (p.buildings_soulcaster || 0) + (p.buildings_spy_network || 0) + (p.buildings_research_library || 0) + (p.buildings_stormshelter || 0) + (p.buildings_whisper_tower || 0),
     maxLand: p.game_data?.maxLand ?? 25,
-      const gameState = result.rows[0].game_data || {};
-      const attacks = (gameState.attacksReceived || []).reverse(); // Most recent first
-    
-      res.json({
-        success: true,
-        attacks: attacks,
-        count: attacks.length
-      });
-    } catch (error) {
-      console.error('Error fetching attacks received:', error);
-      res.status(500).json({ success: false, error: 'Server error fetching attacks' });
-    }
-  });
-
-  /**
-   * GET /api/players
-   * Search and list players (optionally exclude current user)
-   */
-  app.get('/api/players', async (req, res) => {
-
-  /**@@
     dayCount: p.day_count
   }));
 
@@ -716,6 +766,37 @@ app.get('/api/players', async (req, res) => {
     players: publicPlayers,
     count: publicPlayers.length
   });
+});
+
+/**
+ * GET /api/player/attacks-received
+ * Get list of recent conquest attacks received by current player
+ */
+app.get('/api/player/attacks-received', requireAuth, async (req, res) => {
+  try {
+    const playerId = req.auth.playerId;
+
+    const result = await pool.query(
+      `SELECT game_data FROM players WHERE id = $1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    const gameState = result.rows[0].game_data || {};
+    const attacks = (gameState.attacksReceived || []).slice().reverse();
+
+    res.json({
+      success: true,
+      attacks,
+      count: attacks.length
+    });
+  } catch (error) {
+    console.error('Error fetching attacks received:', error);
+    res.status(500).json({ success: false, error: 'Server error fetching attacks' });
+  }
 });
 
 /**
@@ -747,6 +828,30 @@ app.get('/api/rankings', async (req, res) => {
 // ============================================
 // API ENDPOINTS
 // ============================================
+
+/**
+ * GET /api/highstorm/status
+ * Returns current global highstorm state
+ */
+app.get('/api/highstorm/status', (req, res) => {
+  const currentDay = Math.floor(getGameTime() / (24 * 60 * 60 * 1000));
+  
+  res.json({
+    success: true,
+    highstorm: {
+      active: globalHighstorm.active,
+      triggerTime: globalHighstorm.triggerTime,
+      effectsEndDay: globalHighstorm.effectsEndDay,
+      spyBonusActive: globalHighstorm.spyBonusActive,
+      spyBonusEndDay: globalHighstorm.spyBonusEndDay,
+      blackMarketDiscount: globalHighstorm.blackMarketDiscount,
+      blackMarketEndDay: globalHighstorm.blackMarketEndDay,
+      daysSinceStorm: globalHighstorm.daysSinceStorm,
+      nextStormProbability: globalHighstorm.nextStormProbability,
+      currentDay
+    }
+  });
+});
 
 /**
  * GET /api/time

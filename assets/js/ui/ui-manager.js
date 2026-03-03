@@ -23,79 +23,129 @@ export function updateUI(gameState) {
     updateModalsUI(gameState);
     updateEspionageUI(gameState);
 }
-    /**
-     * Show a notification popup when a player is attacked via conquest
-     * @param {Object} gameState - Current game state
-     * @param {Object} attack - Attack record from server with attackerUsername, landLost, buildingsDestroyed, timestamp
-     */
-    export function showConquestAttackNotification(gameState, attack) {
-        const container = document.getElementById('modal-container');
-        if (!container) return;
 
-        const modalId = `conquest-notification-${Date.now()}`;
-        const buildingsDestroyedHtml = attack.buildingsDestroyed && attack.buildingsDestroyed.length > 0
-            ? `<div class="buildings-destroyed">
-                <strong>Buildings Destroyed:</strong>
-                <ul>
-                    ${attack.buildingsDestroyed.map(b => `<li>${b.building}: ${b.count}</li>`).join('')}
-                </ul>
-            </div>`
-            : '';
+/**
+ * Show a notification popup when a player is attacked via conquest
+ * @param {Object} gameState - Current game state
+ * @param {Object} attack - Attack record from server with attackerUsername, landLost, buildingsDestroyed, timestamp
+ */
+export function showConquestAttackNotification(gameState, attack) {
+    const container = document.getElementById('modal-container');
+    if (!container) return;
 
-        const timestamp = new Date(attack.timestamp).toLocaleString();
+    // Trigger screen flash effect
+    const overlay = document.getElementById('screen-overlay');
+    if (overlay) {
+        overlay.style.background = 'radial-gradient(circle, rgba(220, 38, 38, 0.4) 0%, rgba(220, 38, 38, 0) 70%)';
+        overlay.style.animation = 'flash 0.5s ease-out';
+        setTimeout(() => {
+            overlay.style.background = '';
+            overlay.style.animation = '';
+        }, 500);
+    }
 
-        const notificationHtml = `
-            <div class="modal fade show d-block" id="${modalId}" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content bg-dark text-light border-danger">
-                        <div class="modal-header border-danger">
-                            <h5 class="modal-title text-danger">⚔️ You've Been Attacked!</h5>
-                            <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+    const modalId = `conquest-notification-${Date.now()}`;
+    const buildingsLostCount = attack.buildingsDestroyed && attack.buildingsDestroyed.length > 0
+        ? attack.buildingsDestroyed.reduce((sum, b) => sum + b.count, 0)
+        : 0;
+    
+    const buildingsDestroyedHtml = attack.buildingsDestroyed && attack.buildingsDestroyed.length > 0
+        ? `<div class="mt-3 p-3 bg-orange-900/20 border border-orange-500/30 rounded">
+            <div class="text-orange-400 font-bold text-sm mb-2">🏚️ BUILDINGS DESTROYED</div>
+            <div class="space-y-1">
+                ${attack.buildingsDestroyed.map(b => `<div class="flex justify-between text-xs"><span class="text-slate-300">${b.building}</span><span class="text-orange-400">-${b.count}</span></div>`).join('')}
+            </div>
+        </div>`
+        : '<div class="text-emerald-400 text-sm mt-3">✓ No buildings destroyed</div>';
+
+    const timestamp = new Date(attack.timestamp).toLocaleString();
+
+    const notificationHtml = `
+        <div class="modal fade show d-block" id="${modalId}" tabindex="-1" style="animation: shake 0.5s ease-in-out;">
+            <div class="modal-dialog modal-lg" style="margin-top: 10vh;">
+                <div class="modal-content" style="background: linear-gradient(135deg, #1e1b4b 0%, #7f1d1d 100%); border: 2px solid #dc2626; box-shadow: 0 0 40px rgba(220, 38, 38, 0.5);">
+                    <div class="modal-header" style="border-bottom: 2px solid #dc2626; background: rgba(0,0,0,0.3);">
+                        <h5 class="modal-title" style="color: #fca5a5; font-size: 1.5rem; font-weight: bold; text-shadow: 0 0 10px #dc2626;">⚔️ UNDER SIEGE! ⚔️</h5>
+                        <button type="button" class="btn-close btn-close-white" data-dismiss="modal" style="filter: drop-shadow(0 0 5px #dc2626);"></button>
+                    </div>
+                    <div class="modal-body" style="color: #e5e7eb;">
+                        <div class="text-center mb-4" style="padding: 1rem; background: rgba(220, 38, 38, 0.2); border-radius: 8px; border: 1px solid rgba(220, 38, 38, 0.4);">
+                            <div class="text-red-400" style="font-size: 1rem; margin-bottom: 0.5rem;">Your warcamp has been attacked by</div>
+                            <div style="font-size: 1.75rem; font-weight: bold; color: #fca5a5; text-shadow: 0 0 10px #dc2626;">${attack.attackerUsername}</div>
                         </div>
-                        <div class="modal-body">
-                            <div class="alert alert-danger">
-                                <strong>${attack.attackerUsername}</strong> has conquered some of your land!
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <div class="p-3 bg-red-900/30 border border-red-500/50 rounded text-center">
+                                    <div class="text-red-300 text-xs mb-1">TERRITORY LOST</div>
+                                    <div class="text-white font-bold" style="font-size: 2rem;">${attack.landLost}</div>
+                                </div>
                             </div>
-                            <div class="attack-detail">
-                                <p><strong>Land Lost:</strong> <span class="text-danger">${attack.landLost}</span></p>
-                                <p><strong>Time:</strong> ${timestamp}</p>
-                                ${buildingsDestroyedHtml}
+                            <div class="col-6">
+                                <div class="p-3 bg-orange-900/30 border border-orange-500/50 rounded text-center">
+                                    <div class="text-orange-300 text-xs mb-1">BUILDINGS LOST</div>
+                                    <div class="text-white font-bold" style="font-size: 2rem;">${buildingsLostCount}</div>
+                                </div>
                             </div>
                         </div>
-                        <div class="modal-footer border-top border-secondary">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                            <button type="button" class="btn btn-info" onclick="window.location.hash='#spanreed'">View Reports</button>
+
+                        ${buildingsDestroyedHtml}
+                        
+                        <div class="mt-3 text-slate-400 text-xs text-center">
+                            <div>📅 ${timestamp}</div>
                         </div>
+                    </div>
+                    <div class="modal-footer" style="border-top: 2px solid #dc2626; background: rgba(0,0,0,0.3);">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal" style="background: #374151; border: 1px solid #4b5563;">Dismiss</button>
+                        <button type="button" class="btn btn-danger" onclick="window.location.hash='#spanreed'" style="background: #dc2626; border: 1px solid #b91c1c; box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);" data-dismiss="modal">📜 View Full Report</button>
                     </div>
                 </div>
             </div>
-            <div class="modal-backdrop fade show"></div>
-        `;
+        </div>
+        <div class="modal-backdrop fade show" style="background: rgba(0, 0, 0, 0.8);"></div>
+    `;
 
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = notificationHtml;
-        const modal = tempDiv.querySelector('.modal');
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = notificationHtml;
+    const modal = tempDiv.querySelector('.modal');
+    const backdrop = tempDiv.querySelector('.modal-backdrop');
 
-        container.appendChild(modal);
-        container.appendChild(tempDiv.querySelector('.modal-backdrop'));
+    container.appendChild(modal);
+    container.appendChild(backdrop);
 
-        // Setup close button
-        const closeBtn = modal.querySelector('[data-dismiss="modal"]');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                modal.remove();
-                container.querySelector('.modal-backdrop')?.remove();
-            });
-        }
-
-        // Auto-close after 10 seconds
-        setTimeout(() => {
+    // Setup close buttons
+    const closeBtns = modal.querySelectorAll('[data-dismiss="modal"]');
+    closeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
             modal.remove();
-            container.querySelector('.modal-backdrop')?.remove();
-        }, 10000);
+            backdrop.remove();
+        });
+    });
 
-        console.log('🎯 Conquest attack notification displayed:', attack);
-    }
+    // Auto-close after 15 seconds
+    setTimeout(() => {
+        if (modal.parentNode) modal.remove();
+        if (backdrop.parentNode) backdrop.remove();
+    }, 15000);
+
+    // Add detailed report to Spanreed Center
+    const buildingsText = attack.buildingsDestroyed && attack.buildingsDestroyed.length > 0
+        ? attack.buildingsDestroyed.map(b => `${b.building} (${b.count})`).join(', ')
+        : 'None';
+    
+    const reportMessage = `🚨 ATTACKED by ${attack.attackerUsername}! Lost ${attack.landLost} land${buildingsLostCount > 0 ? ` and ${buildingsLostCount} buildings` : ''}.`;
+    
+    addReport(gameState, 'pvp-defense', reportMessage, {
+        attacker: attack.attackerUsername,
+        landLost: attack.landLost,
+        buildingsDestroyed: attack.buildingsDestroyed || [],
+        buildingsLostCount,
+        timestamp: attack.timestamp,
+        success: false // Defender was breached
+    });
+
+    console.log('🎯 Conquest attack notification displayed:', attack);
+}
 
 function updateModalsUI(gameState) {
     // Update modal visibility and stats
@@ -721,7 +771,9 @@ export function updateReportsList(gameState) {
         attack: 'orange',
         plateau: 'green',
         growth: 'blue',
-        defense: 'red'
+        defense: 'red',
+        'pvp-defense': 'red',
+        conquest: 'orange'
     };
     
     list.innerHTML = gameState.state.reports.map((report, index) => {
@@ -730,7 +782,10 @@ export function updateReportsList(gameState) {
         const detailsId = `report-details-${index}`;
         
         // Display name mapping
-        const displayName = report.type === 'growth' ? 'Daily Report' : report.type;
+        const displayName = report.type === 'growth' ? 'Daily Report' 
+                          : report.type === 'pvp-defense' ? '🚨 PvP Defense'
+                          : report.type === 'conquest' ? '⚔️ Conquest'
+                          : report.type;
         
         // Generate detailed information HTML based on report type
         let detailsHTML = '';
@@ -851,6 +906,24 @@ export function updateReportsList(gameState) {
             }
             
             detailsHTML = incomeHTML + costsHTML + netHTML + missionsHTML;
+        } else if (report.type === 'pvp-defense' && report.data) {
+            const buildingsLost = report.data.buildingsDestroyed && report.data.buildingsDestroyed.length > 0
+                ? `<div class="mt-2 pt-2 border-t border-${color}-500/20">
+                    <div class="text-[10px] uppercase text-orange-400 font-bold mb-1">BUILDINGS DESTROYED</div>
+                    <div class="space-y-1 text-xs">
+                        ${report.data.buildingsDestroyed.map(b => `<div class="flex justify-between"><span class="text-slate-400">${b.building}:</span><span class="text-orange-400">-${b.count}</span></div>`).join('')}
+                    </div>
+                </div>`
+                : '<div class="mt-2 pt-2 border-t border-green-500/20 text-xs text-green-400">✓ No buildings destroyed</div>';
+            
+            detailsHTML = `
+                <div class="mt-2 pt-2 border-t border-${color}-500/20 space-y-1 text-xs">
+                    <div><span class="text-slate-400">Attacker:</span> <span class="text-red-400 font-bold">${report.data.attacker || 'Unknown'}</span></div>
+                    <div><span class="text-slate-400">Land Lost:</span> <span class="text-red-300">${report.data.landLost || 0}</span></div>
+                    <div><span class="text-slate-400">Buildings Lost:</span> <span class="text-orange-400">${report.data.buildingsLostCount || 0}</span></div>
+                </div>
+                ${buildingsLost}
+            `;
         } else if (report.type === 'defense' && report.data) {
             detailsHTML = `
                 <div class="mt-2 pt-2 border-t border-${color}-500/20 space-y-1 text-xs">

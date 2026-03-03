@@ -1,7 +1,7 @@
 // Highstorm event system - devastating weather events
 import { BUILDING_DATA, CONSTANTS } from '../core/constants.js';
 import { log, triggerNotification } from '../core/utils.js';
-import { getCurrentGameTime } from '../core/server-api.js';
+import { getCurrentGameTime, fetchHighstormStatus } from '../core/server-api.js';
 import { getBuildingCost } from '../buildings/buildings.js';
 import { processCasualties } from '../military/military.js';
 import { addReport } from '../ui/ui-manager.js';
@@ -13,35 +13,75 @@ let phase3Timeout = null;
 let notificationUpdateInterval = null;
 
 /**
- * Check if a highstorm should occur and trigger it
+ * Check server for global highstorm status and sync with local state
  * @param {Object} gameState - Current game state
  */
-export function checkHighstorm(gameState) {
-    const storm = gameState.state.highstorm;
-    
-    // If no storm tracking exists, initialize it
-    if (!storm) {
-        gameState.state.highstorm = {
-            lastStormDay: -10,
-            daysSinceStorm: 10,
-            nextStormProbability: 0
-        };
-        return;
-    }
-    
-    storm.daysSinceStorm++;
-    
-    // Calculate highstorm probability
-    if (storm.daysSinceStorm <= 3) {
-        storm.nextStormProbability = 0; // Cannot happen 3 days after previous storm
-    } else {
-        // Increasing probability: 5% at day 4, then +5% each day
-        storm.nextStormProbability = Math.min(0.5, (storm.daysSinceStorm - 3) * 0.05);
-    }
-    
-    // Roll for highstorm
-    if (Math.random() < storm.nextStormProbability) {
-        triggerHighstorm(gameState);
+export async function checkHighstorm(gameState) {
+    try {
+        const serverStorm = await fetchHighstormStatus();
+        
+        if (!serverStorm) {
+            console.warn('Failed to fetch highstorm status from server');
+            return;
+        }
+        
+        const storm = gameState.state.highstorm;
+        
+        // Initialize local tracking if it doesn't exist
+        if (!storm) {
+            gameState.state.highstorm = {
+                lastStormDay: serverStorm.currentDay - serverStorm.daysSinceStorm,
+                daysSinceStorm: serverStorm.daysSinceStorm,
+                nextStormProbability: serverStorm.nextStormProbability,
+                active: serverStorm.active,
+                effectsEndDay: serverStorm.effectsEndDay,
+                triggerTime: serverStorm.triggerTime,
+                spyBonusActive: serverStorm.spyBonusActive,
+                spyBonusEndDay: serverStorm.spyBonusEndDay,
+                blackMarketDiscount: serverStorm.blackMarketDiscount,
+                blackMarketEndDay: serverStorm.blackMarketEndDay,
+                lastSyncedTriggerTime: serverStorm.triggerTime
+            };
+            return;
+        }
+        
+        // Detect if a NEW highstorm has occurred on the server
+        const isNewHighstorm = serverStorm.active && 
+                              serverStorm.triggerTime && 
+                              serverStorm.triggerTime !== storm.lastSyncedTriggerTime;
+        
+        if (isNewHighstorm) {
+            // A new highstorm has been triggered on the server!
+            console.log('⚡ New highstorm detected from server!');
+            
+            // Update local tracking
+            storm.lastStormDay = serverStorm.currentDay - serverStorm.daysSinceStorm;
+            storm.daysSinceStorm = 0;
+            storm.nextStormProbability = 0;
+            storm.active = true;
+            storm.effectsEndDay = serverStorm.effectsEndDay;
+            storm.triggerTime = serverStorm.triggerTime;
+            storm.lastSyncedTriggerTime = serverStorm.triggerTime;
+            storm.spyBonusActive = serverStorm.spyBonusActive;
+            storm.spyBonusEndDay = serverStorm.spyBonusEndDay;
+            storm.blackMarketDiscount = serverStorm.blackMarketDiscount;
+            storm.blackMarketEndDay = serverStorm.blackMarketEndDay;
+            
+            // Trigger local highstorm effects
+            triggerHighstorm(gameState);
+        } else {
+            // Just sync state without triggering effects
+            storm.daysSinceStorm = serverStorm.daysSinceStorm;
+            storm.nextStormProbability = serverStorm.nextStormProbability;
+            storm.active = serverStorm.active;
+            storm.effectsEndDay = serverStorm.effectsEndDay;
+            storm.spyBonusActive = serverStorm.spyBonusActive;
+            storm.spyBonusEndDay = serverStorm.spyBonusEndDay;
+            storm.blackMarketDiscount = serverStorm.blackMarketDiscount;
+            storm.blackMarketEndDay = serverStorm.blackMarketEndDay;
+        }
+    } catch (error) {
+        console.error('Error checking highstorm status:', error);
     }
 }
 
