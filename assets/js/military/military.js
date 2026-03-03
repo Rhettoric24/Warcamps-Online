@@ -4,6 +4,7 @@ import { log } from '../core/utils.js';
 import { canRecruit } from '../core/validation.js';
 import { getChullProtection } from '../events/highstorm.js';
 import { getEffectiveBuildingBonus } from '../buildings/buildings.js';
+import { recruitUnits, applyActionResult } from '../core/actions.js';
 
 export function getAvailableTroops(gameState) {
     const avail = { ...gameState.state.military };
@@ -91,9 +92,6 @@ export async function recruit(gameState, type) {
     }
 
     // Server-authoritative: Call atomic recruit endpoint
-    const { recruitUnits } = await import('../core/actions.js');
-    const { applyActionResult } = await import('../core/actions.js');
-    
     const result = await recruitUnits(type, amount);
     
     if (!result.success) {

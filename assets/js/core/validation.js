@@ -33,7 +33,7 @@ export function canAffordResource(gameState, cost, resourceType = 'spheres') {
  * @param {string} buildingKey - Building identifier
  * @returns {Object} { valid: boolean, reason: string, cost: number }
  */
-export function canBuild(gameState, buildingKey) {
+export function canBuild(gameState, buildingKey, count = 1) {
     const buildData = BUILDING_DATA[buildingKey];
     
     if (!buildData) {
@@ -49,18 +49,19 @@ export function canBuild(gameState, buildingKey) {
         };
     }
     
-    // Check cost
+    // Check cost for all buildings
     const cost = getBuildingCost(gameState, buildingKey);
-    const affordCheck = canAffordResource(gameState, cost, 'spheres');
+    const totalCost = cost * count;
+    const affordCheck = canAffordResource(gameState, totalCost, 'spheres');
     if (!affordCheck.valid) {
         return {
             valid: false,
-            reason: affordCheck.reason,
-            cost: cost
+            reason: `${affordCheck.reason} (need ${totalCost.toLocaleString()} for ${count} ${buildingKey})`,
+            cost: totalCost
         };
     }
 
-    // Check land availability
+    // Check land availability (simplified - just check one building for now, server will validate total)
     const landCost = buildData.landCost || 0;
     const usedLand = gameState.state.land || 0;
     const maxLand = gameState.state.maxLand || 25;
@@ -69,7 +70,7 @@ export function canBuild(gameState, buildingKey) {
         return {
             valid: false,
             reason: `Insufficient territory. Need ${landCost} land, have ${availableLand} available. Conquer more territory.`,
-            cost: cost,
+            cost: totalCost,
             landCost: landCost,
             availableLand: availableLand
         };
@@ -83,12 +84,12 @@ export function canBuild(gameState, buildingKey) {
                 valid: false,
                 reason: `Requires ${buildData.requires} to be built first.`,
                 requiresFirst: buildData.requires,
-                cost: cost
+                cost: totalCost
             };
         }
     }
     
-    return { valid: true, cost: cost, landCost: landCost };
+    return { valid: true, cost: totalCost, landCost: landCost * count };
 }
 
 /**
