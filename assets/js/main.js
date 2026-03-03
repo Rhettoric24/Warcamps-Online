@@ -389,7 +389,7 @@ const gameInstance = {
         }
     },
 
-    loop() {
+    async loop() {
         const now = getCurrentGameTime();
         const currentDay = gameMsToDays(now);
         const lastDay = this.state.dayCount || 0;
@@ -409,7 +409,10 @@ const gameInstance = {
         }
 
         this.checkPlateau();
-        checkDeployments(this);
+        await checkDeployments(this);
+        // Re-sync state after deployments complete (PvP conquests are async)
+        saveGameState(this.username, this);
+        
         updateUI(this);
         this.state.lastActiveTime = now;
         this.state.lastGameTime = now; // Track server game time

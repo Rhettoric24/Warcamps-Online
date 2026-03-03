@@ -508,20 +508,42 @@ export async function confirmDeploy(gameState) {
     closeDeployModal();
 }
 
-export function checkDeployments(gameState) {
+export async function checkDeployments(gameState) {
     const now = getCurrentGameTime();
     const finished = gameState.state.deployments.filter(d => now >= d.returnTime);
     gameState.state.deployments = gameState.state.deployments.filter(d => now < d.returnTime);
-    finished.forEach(d => {
+    
+    // Collect promises for async operations (PvP conquests)
+    const resolutionPromises = [];
+    
+    for (const d of finished) {
         if (d.type === 'espionage') {
             resolveSpy(gameState, d);
         } else {
-            resolveMission(gameState, d);
+            // resolveMission initiates async conquest transfers
+            // We track the promise to ensure state is synced after completion
+            const promise = resolveMission(gameState, d);
+            if (promise && promise.then) {
+                resolutionPromises.push(promise);
+            }
         }
-    });
+    }
+    
+    // Wait for any async PvP operations to complete before returning
+    // This ensures the game state is fully updated and ready to save
+    if (resolutionPromises.length > 0) {
+        try {
+            await Promise.all(resolutionPromises);
+        } catch (error) {
+            console.error('Error during deployment resolution:', error);
+        }
+    }
 }
 
 export function resolveMission(gameState, deployment) {
+    // For PvP conquests with async server calls, return a promise
+    // For other missions, execute synchronously and return null
+    
     let power = 0;
     let carry = 0;
     let unitsBefore = 0;
@@ -536,6 +558,7 @@ export function resolveMission(gameState, deployment) {
     }
 
     if (deployment.type === 'run') {
+        // Plateau run resolution - synchronous
         const res = deployment.runResult;
         if (res.victory) {
             log(`CAMPAIGN VICTORY! Coalition Power ${Math.floor(res.totalPower)} crushed ${res.enemyPower}.`, "text-green-400 font-bold");
@@ -575,7 +598,7 @@ export function resolveMission(gameState, deployment) {
             }
             showPlateauRunResult(gameState, false, 0, casualtiesCount, false, null);
         }
-        return;
+        return null;
     }
 
     const carryBonus = 1 + (carry * 0.01);
@@ -724,7 +747,8 @@ export function resolveMission(gameState, deployment) {
                 } else {
                     const targetUsername = extractPlayerUsername(target);
 
-                    executePlayerConquest(targetUsername, actualLandGained)
+                    // Return a promise that resolves after the PvP conquest completes
+                    return executePlayerConquest(targetUsername, actualLandGained)
                         .then(result => {
                             if (!result.success) {
                                 log(`Conquest battle won vs ${targetName}, but land transfer failed: ${result.error}`, "text-yellow-400 font-bold");
@@ -751,8 +775,6 @@ export function resolveMission(gameState, deployment) {
                             log(`Conquest battle won vs ${targetName}, but land transfer failed due to server error.`, "text-yellow-400 font-bold");
                             showConquestResult(gameState, true, 0, casualtiesCount, playerPower, enemyPower);
                         });
-
-                    return;
                 }
             }
             
